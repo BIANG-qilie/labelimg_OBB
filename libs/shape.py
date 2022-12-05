@@ -125,8 +125,10 @@ class Shape(object):
             painter.drawPath(line_path)
             painter.drawPath(vrtx_path)
             painter.drawPath(originPoint_path)
-            painter.fillPath(vrtx_path, self.vertex_fill_color)
-            painter.fillPath(originPoint_path, self.origin_fill_color)
+            #painter.fillPath(vrtx_path, self.vertex_fill_color)
+            #painter.fillPath(originPoint_path, self.origin_fill_color)
+            painter.fillPath(vrtx_path, QColor(0, 0, 255))
+            painter.fillPath(originPoint_path, QColor(0, 0, 255))
 
             # Print debug info
             min_x = sys.maxsize
@@ -143,7 +145,10 @@ class Shape(object):
                     self.label = ""
                 if(min_y < MIN_Y_LABEL):
                     min_y += MIN_Y_LABEL
-                painter.drawText(min_x, min_y, "h={0:.1f}, w={1:.1f} , \u03F4={2:.1f}".format(self.height, self.width, self.angle))
+                painter.drawText(min_x, min_y,
+                                 "s={2:.1f} , \u03F4={2:.1f}".format(self.width * self.height,self.angle))
+                #
+                #painter.drawText(min_x, min_y, "h={0:.1f}, w={1:.1f}, s={2:.1f} , \u03F4={2:.1f}".format(self.height, self.width, self.width*self.height, self.angle))
 
             # Draw text at the top-left
             if self.paintLabel:
