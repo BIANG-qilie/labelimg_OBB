@@ -24,3 +24,5 @@ rotation bbox:
   m= +5
   
   ,= -5
+
+for small scale data, use 1/3/5 degree labeling is sufficient enough.
