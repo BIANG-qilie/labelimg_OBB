@@ -147,7 +147,7 @@ class Shape(object):
                     min_y += MIN_Y_LABEL
                 painter.drawText(min_x, min_y,
                                  "s={2:.1f} , \u03F4={2:.1f}".format(self.width * self.height,self.angle))
-                #
+                # 
                 #painter.drawText(min_x, min_y, "h={0:.1f}, w={1:.1f}, s={2:.1f} , \u03F4={2:.1f}".format(self.height, self.width, self.width*self.height, self.angle))
 
             # Draw text at the top-left
