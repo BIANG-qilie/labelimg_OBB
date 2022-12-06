@@ -117,7 +117,7 @@ class Shape(object):
             for i, p in enumerate(self.points):
                 line_path.lineTo(p)
                 self.drawVertex(vrtx_path, i)
-            self.drawOrigin(originPoint_path) # Draw object origin (centre)
+            self.drawOrigin(originPoint_path)  # Draw object origin (centre)
             
             if self.isClosed():
                 line_path.lineTo(self.points[0])
@@ -138,19 +138,19 @@ class Shape(object):
                 min_y = min(min_y, point.y())
             if min_x != sys.maxsize and min_y != sys.maxsize:
                 font = QFont()
-                font.setPointSize(10)
+                font.setPointSize(8)
                 font.setBold(True)
                 painter.setFont(font)
-                if(self.label == None):
+                if self.label == None:
                     self.label = ""
-                if(min_y < MIN_Y_LABEL):
+                if min_y < MIN_Y_LABEL:
                     min_y += MIN_Y_LABEL
                 painter.drawText(min_x, min_y,
-                                 "s={2:.1f} , \u03F4={2:.1f}".format(self.width * self.height,self.angle))
-                # 
-                #painter.drawText(min_x, min_y, "h={0:.1f}, w={1:.1f}, s={2:.1f} , \u03F4={2:.1f}".format(self.height, self.width, self.width*self.height, self.angle))
+                                 "s={0:.1f} , \u03F4={1:.1f}".format(self.width * self.height, self.angle))
 
-            # Draw text at the top-left
+                #painter.drawText(min_x, min_y, "h={0:.1f}, w={1:.1f}, s={2:.1f} , \u03F4={3:.1f}".format(self.height, self.width, self.width*self.height, self.angle))
+
+            # Draw label at the top-left
             if self.paintLabel:
                 min_x = sys.maxsize
                 min_y = sys.maxsize
@@ -166,7 +166,7 @@ class Shape(object):
                         self.label = ""
                     if(min_y < MIN_Y_LABEL):
                         min_y += MIN_Y_LABEL
-                    painter.drawText(min_x, min_y, self.label)
+                    painter.drawText(min_x, min_y+10, self.label)
 
             if self.fill:
                 color = self.select_fill_color if self.selected else self.fill_color
