@@ -5,10 +5,11 @@
 A[0:8]: Polygons with format (x1, y1, x2, y2, x3, y3, x4, y4).
 A[8]: Category.
 A[9]: Difficulty.
-模拟类似KITTI按seq
-    图像归类到imgs子目录
-    传统bbox检测框,归类到bbox子目录
-    旋转bbox检测框,归类到obb子目录
+需要将所有图像合并, 6位,前2位为序列,后四位为帧号.
+合并后imgs和labels各一个子目录, 图像和标签都需要统一命名
+mergeddate|
+          |-imgs
+          |-labels
     ...候选补充目标分割
     ...候选补充语义分割(本体,太阳帆,喷嘴三小类)
 '''
@@ -18,14 +19,17 @@ import glob
 import cv2
 import math
 
-fatherPath = '/home/kid/dataset/dixia/obb'
-# seqs = ['seq1', 'seq3', 'seq4', 'seq5', 'seq6', 'seq8', 'seq2', 'seq3-2', 'seq4-2', 'seq5-2', 'seq6-2', 'seq7']
-seqs = ['seq2']
+fatherPath = '/home/kid/dataset/dixia/obb'  # source
+DesPath = '/home/kid/dataset/dixia/obb/mergeddata'  # destination
+seqs = ['seq1', 'seq3', 'seq4', 'seq5', 'seq6', 'seq8']  # train, 'seq2', 'seq3-2', 'seq4-2', 'seq5-2', 'seq6-2', 'seq7']
+# seqs = ['seq1']
 
 bbox_coords = []
 obb_coords = []
+
 im_width = 1024.0
 im_height = 768.0
+
 def checkSubFolder(path):
     if os.path.exists(path):
         return True
@@ -46,7 +50,7 @@ def readLabels(path):
         is_rotated = False
         smallest_coord = []
         smallest_area = 9999999999.0
-        for i in range(1, len(ls)):
+        for i in range(1, len(ls)):  # line-1: string
             cur = ls[i].split(' ')
             # print(i)
             x_c = float(cur[1])
@@ -59,7 +63,7 @@ def readLabels(path):
                 cur_area = w * h
                 if cur_area < smallest_area:
                     smallest_area = cur_area
-                    smallest_coord.append([x_c, y_c, w, h, a, label])
+                    smallest_coord = [x_c, y_c, w, h, a, label]
                 bbox_coords.append([x_c, y_c, w, h, a, label])
 
             elif i > 1:
@@ -69,10 +73,10 @@ def readLabels(path):
                 if cur_area < smallest_area:
                     smallest_area = cur_area
                     is_rotated = True
-                    smallest_coord.append([x_c, y_c, w, h, a, label])
+                    smallest_coord = [x_c, y_c, w, h, a, label]
                 # obb_coords.append([x_c, y_c, w, h, a, label])
     # only involve the smallest case as obb
-    obb_coords.append(smallest_coord[0])
+    obb_coords.append(smallest_coord)
         # if not is_rotated:
         #    print(path, 'obb is larger than bbox.')
 
@@ -151,7 +155,7 @@ def getRotatedCoord(c):
 def operateObb(dpath, clist, cname):
     assert len(obb_coords) != 0
     labelfile = os.path.join(dpath, cname)
-    for bbox in bbox_coords:
+    for bbox in obb_coords:
         labelStr = clist[int(bbox[5])]  # label string
         # coord calculate
         dif = 0  # default
@@ -166,34 +170,35 @@ def operateObb(dpath, clist, cname):
 
 for seq in seqs:
 
-    destPath = os.path.join(fatherPath, seq)
+    source_Path = os.path.join(fatherPath, seq)
 
-    if not os.path.exists(destPath):
+    if not os.path.exists(source_Path):
         continue
-    print(destPath)
-    imgPath = os.path.join(destPath, 'imgs')
-    bboxPath = os.path.join(destPath, 'bbox')
-    obbPath = os.path.join(destPath, 'obb')
+    print(source_Path)
+    imgPath = os.path.join(DesPath, 'imgs')
+    # bboxPath = os.path.join(source_Path, 'bbox')
+    obbPath = os.path.join(DesPath, 'obb')
     checkSubFolder(imgPath)
-    checkSubFolder(bboxPath)
+    # checkSubFolder(bboxPath)
     checkSubFolder(obbPath)
 
     # 以jpg文件为基准
-    imglist = glob.glob(destPath+'/*.jpg')
-    classList = readclasses(destPath)
+    imglist = glob.glob(source_Path+'/*.jpg')
+    classList = readclasses(source_Path)
+
     imglist.sort()
     for img in imglist:
-        # print(img)
-        dest = os.path.join(imgPath, img.split('/')[-1])
-        # shutil.move(img, dest)  # final
-        # shutil.copy(img, dest)  # test
+        #print(img)
+        destImg = os.path.join(imgPath, seq+"_"+img.split('/')[-1])
+
+        shutil.copy(img, destImg)  # copy to dest
         # read and create bbox/obb
         sourceLabel = img.replace('.jpg', '.txt')
+        destLabel = os.path.join(obbPath, seq+"_"+sourceLabel.split('/')[-1])
         # print(sourceLabel)
-        sourceLabel
         readLabels(sourceLabel)  # label-> bbox_coords & obb_coords
-        operateBbox(bboxPath, classList, img.split('/')[-1].replace('.jpg', '.txt'))
-        operateObb(obbPath, classList, img.split('/')[-1].replace('.jpg', '.txt'))
+        # operateBbox(bboxPath, classList, img.split('/')[-1].replace('.jpg', '.txt'))
+        operateObb(obbPath, classList, destLabel)
 
 
 

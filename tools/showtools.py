@@ -3,8 +3,8 @@ import numpy as np
 import cv2
 import math
 
-imgpath = '/home/kid/camera_ws/src/ROS_spinnaker/data/seq1/000050.jpg'
-labelpath = '/home/kid/camera_ws/src/ROS_spinnaker/data/seq1/000050.txt'
+imgpath = '/home/kid/dataset/dixia/obb/mergeddata/imgs'
+labelpath = '/home/kid/dataset/dixia/obb/mergeddata/obb'
 
 def DOTAFormateTest():
     red = (0, 0, 255)
@@ -32,8 +32,6 @@ def DOTAFormateTest():
     cv2.waitKey()
     cv2.destroyAllWindows()
 
-
-
 def readtxt(path):
     coords = []
     with open(path, 'r') as f:
@@ -49,6 +47,25 @@ def readtxt(path):
             coords.append([x_c, y_c, w, h, a])
     return coords
 # coords = [[cx, cy, w, h, a], ...]
+
+
+def readDOTAtxt(path):
+    coords = []
+    with open(path, 'r') as f:
+        ls = f.readlines()
+        for i in ls:
+            x = []
+            y = []
+            i = i.split(' ')
+            # print(i)
+            coords.append([float(i[0]), float(i[1])])
+            coords.append([float(i[2]), float(i[3])])
+            coords.append([float(i[4]), float(i[5])])
+            coords.append([float(i[6]), float(i[7])])
+            # coords.append([x_c, y_c, w, h, a])
+    return coords
+
+
 def getRotatedCoord(coords, img):
     height, width, _ = img.shape
     print(height, width)
@@ -84,7 +101,9 @@ def getRotatedCoord(coords, img):
 
 def drawRotatedRect(co, im):  # co= [4points, 4points, ...]
     red = (0, 0, 255)
+    '''
     for c in co:  # each bbox in box list
+        
         x_ps = c[0]
         y_ps = c[1]
         pt0 = (int(x_ps[0]), int(y_ps[0]))
@@ -95,10 +114,20 @@ def drawRotatedRect(co, im):  # co= [4points, 4points, ...]
         cv2.line(im, pt1, pt2, red, 2)
         cv2.line(im, pt2, pt3, red, 2)
         cv2.line(im, pt3, pt0, red, 2)
+    '''
+    for i in range(4):
+        # print(i, (i+1) % 4)
+        x1 = int(co[i][0])
+        y1 = int(co[i][1])
+        x2 = int(co[(i+1) % 4][0])
+        y2 = int(co[(i+1) % 4][1])
+        cv2.line(im, (x1, y1), (x2, y2), red, 2)
     return im
 
-def vis():
-    co = readtxt(labelpath)
+
+#labels are yolo format
+def vis(clabel, cimg):
+    co = readtxt(clabel)
     x_c = co[0][0]
     y_c = co[0][1]
     w = co[0][2]
@@ -107,7 +136,7 @@ def vis():
     xmin, ymin = int(x_c - w / 2), int(y_c - h / 2)
     xmax, ymax = int(x_c + w / 2), int(y_c + h / 2)
     print((xmin, ymin), (xmax, ymax), a)
-    im = cv2.imread(imgpath)
+    im = cv2.imread(cimg)
     im = cv2.rectangle(im, (xmin, ymin), (xmax, ymax), (255, 0, 0), 2)  # (B,G,R)
     # rotatedrect = cv2.RotatedRect((x_c, y_c), (w, h), a)  # only cpp
     #print(rotatedrect)
@@ -117,5 +146,26 @@ def vis():
     cv2.waitKey()
     cv2.destroyAllWindows()
 
-vis()
+# labels are DOTA format
+def visDOTA(clabel, cimg):
+    new_co = readDOTAtxt(clabel)
+    im = cv2.imread(cimg)
+    #im = cv2.rectangle(im, (xmin, ymin), (xmax, ymax), (255, 0, 0), 2)  # (B,G,R)
+    # rotatedrect = cv2.RotatedRect((x_c, y_c), (w, h), a)  # only cpp
+    #print(rotatedrect)
+    # new_co = getRotatedCoord(co, im)
+    im = drawRotatedRect(new_co, im)
+
+    cv2.imshow("", im)
+    cv2.waitKey()
+    cv2.destroyAllWindows()
+
+
+# vis()
 # DOTAFormateTest()
+imglist = os.listdir(imgpath)
+imglist.sort()
+for img in imglist:
+    curImg = os.path.join(imgpath, img)
+    curLabel = os.path.join(labelpath, img.replace('.jpg', '.txt'))
+    visDOTA(curLabel, curImg)
