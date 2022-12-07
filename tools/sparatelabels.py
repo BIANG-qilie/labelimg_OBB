@@ -21,7 +21,8 @@ import math
 
 fatherPath = '/home/kid/dataset/dixia/obb'  # source
 DesPath = '/home/kid/dataset/dixia/obb/mergeddata'  # destination
-seqs = ['seq1', 'seq3', 'seq4', 'seq5', 'seq6', 'seq8']  # train, 'seq2', 'seq3-2', 'seq4-2', 'seq5-2', 'seq6-2', 'seq7']
+seqs = ['seq1', 'seq3', 'seq4', 'seq5', 'seq6', 'seq8']  # train,
+# seqs = ['seq2', 'seq7', 'seq9'] #, 'seq5-2', 'seq6-2', 'seq7']
 # seqs = ['seq1']
 
 bbox_coords = []
@@ -188,8 +189,10 @@ for seq in seqs:
 
     imglist.sort()
     for img in imglist:
-        #print(img)
-        destImg = os.path.join(imgPath, seq+"_"+img.split('/')[-1])
+        print(img)
+        #if float(img.split('/')[-1].split('.')[0]) == 242:
+        #    print(img)
+        destImg = os.path.join(imgPath, seq+"_"+img.split('/')[-1]).replace('.jpg', '.png')  # fit the DOTA png script
 
         shutil.copy(img, destImg)  # copy to dest
         # read and create bbox/obb
