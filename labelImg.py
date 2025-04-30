@@ -277,6 +277,7 @@ class MainWindow(QMainWindow, WindowMixin):
         showQuickInstr = action(getStr('quickinstr'), self.showQuickInstrDialog, None, 'help', getStr('quickinstr'))
         help = action(getStr('tutorial'), self.showTutorialDialog, None, 'help', getStr('tutorialDetail'))
         showInfo = action(getStr('info'), self.showInfoDialog, None, 'help', getStr('info'))
+        showShortcuts = action('快捷键说明', self.showShortcutsDialog, None, 'help', '显示所有快捷键说明')
 
         zoom = QWidgetAction(self)
         zoom.setDefaultWidget(self.zoomWidget)
@@ -386,7 +387,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
         addActions(self.menus.file,
                    (open, opendir, changeSavedir, openAnnotation, self.menus.recentFiles, save, save_format, saveAs, close, resetAll, quit))
-        addActions(self.menus.help, (showQuickInstr, help, showInfo))
+        addActions(self.menus.help, (showQuickInstr, help, showInfo, showShortcuts))
         addActions(self.menus.view, (
             self.autoSaving,
             self.singleClassMode,
@@ -644,6 +645,39 @@ class MainWindow(QMainWindow, WindowMixin):
     def showInfoDialog(self):
         msg = u'Name:{0} \nApp Version:{1} \n{2} '.format(__appname__, __version__, sys.version_info)
         QMessageBox.information(self, u'Information', msg)
+
+    def showShortcutsDialog(self):
+        msg = u'''
+快捷键说明：
+
+标注操作：
+W - 创建旋转矩形框
+Ctrl + J - 编辑模式
+
+旋转矩形框操作：
+O - 顺时针旋转0.1度
+P - 逆时针旋转0.1度
+K - 顺时针旋转1度
+L - 逆时针旋转1度
+M - 顺时针旋转5度
+, - 逆时针旋转5度
+
+图像导航：
+D - 下一张图像
+A - 上一张图像
+Space - 将当前图像标记为已验证
+
+缩放控制：
+Ctrl + + - 放大
+Ctrl + - - 缩小
+Ctrl + = - 原始大小
+Ctrl + F - 适应窗口
+Ctrl + Shift + F - 适应宽度
+
+其他：
+方向键 - 移动选中的矩形框
+'''
+        QMessageBox.information(self, u'快捷键说明', msg)
 
     def createShape(self):
         assert self.beginner()
@@ -928,6 +962,7 @@ class MainWindow(QMainWindow, WindowMixin):
             if len(self.labelHist) > 0:
                 self.labelDialog = LabelDialog(
                     parent=self, listItem=self.labelHist)
+                print(f"创建LabelDialog时使用的类别: {self.labelHist}")  # 添加调试信息
 
             # Sync single class mode from PR#106
             if self.singleClassMode.isChecked() and self.lastLabel:
@@ -1059,6 +1094,17 @@ class MainWindow(QMainWindow, WindowMixin):
             fileWidgetItem.setSelected(True)
 
         if unicodeFilePath and os.path.exists(unicodeFilePath):
+            # 查找classes.txt
+            dir_path = os.path.dirname(unicodeFilePath)
+            classes_file = os.path.join(dir_path, 'classes.txt')
+            if os.path.exists(classes_file):
+                self.loadPredefinedClasses(classes_file)
+            else:
+                # 如果没有找到classes.txt，使用默认的预定义类别文件
+                default_classes_file = os.path.join(os.path.dirname(sys.argv[0]), 'data', 'predefined_classes.txt')
+                if os.path.exists(default_classes_file):
+                    self.loadPredefinedClasses(default_classes_file)
+
             if LabelFile.isLabelFile(unicodeFilePath):
                 try:
                     self.labelFile = LabelFile(unicodeFilePath)
@@ -1272,7 +1318,24 @@ class MainWindow(QMainWindow, WindowMixin):
         targetDirPath = ustr(QFileDialog.getExistingDirectory(self,
                                                      '%s - Open Directory' % __appname__, defaultOpenDirPath,
                                                      QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks))
-        self.importDirImages(targetDirPath)
+        
+        # 查找classes.txt
+        if targetDirPath:
+            classes_file = os.path.join(targetDirPath, 'classes.txt')
+            print(f"正在查找classes.txt: {classes_file}")
+            if os.path.exists(classes_file):
+                print(f"找到classes.txt: {classes_file}")
+                self.loadPredefinedClasses(classes_file)
+            else:
+                # 如果没有找到classes.txt，使用默认的预定义类别文件
+                default_classes_file = os.path.join(os.path.dirname(sys.argv[0]), 'data', 'predefined_classes.txt')
+                print(f"未找到classes.txt，尝试使用默认文件: {default_classes_file}")
+                if os.path.exists(default_classes_file):
+                    self.loadPredefinedClasses(default_classes_file)
+                else:
+                    print("未找到默认的预定义类别文件")
+            
+            self.importDirImages(targetDirPath)
 
     def importDirImages(self, dirpath):
         if not self.mayContinue() or not dirpath:
@@ -1487,13 +1550,15 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def loadPredefinedClasses(self, predefClassesFile):
         if os.path.exists(predefClassesFile) is True:
+            self.labelHist = []
             with codecs.open(predefClassesFile, 'r', 'utf8') as f:
                 for line in f:
                     line = line.strip()
-                    if self.labelHist is None:
-                        self.labelHist = [line]
-                    else:
-                        self.labelHist.append(line)
+                    self.labelHist.append(line)
+            # 更新LabelDialog
+            if hasattr(self, 'labelDialog'):
+                self.labelDialog = LabelDialog(parent=self, listItem=self.labelHist)
+            print(f"已加载类别: {self.labelHist}")  # 添加调试信息
 
     def loadPascalXMLByFilename(self, xmlPath):
         if self.filePath is None:
@@ -1565,7 +1630,7 @@ def get_main_app(argv=[]):
     win = MainWindow(argv[1] if len(argv) >= 2 else None,
                      argv[2] if len(argv) >= 3 else os.path.join(
                          os.path.dirname(sys.argv[0]),
-                         'data', 'predefined_classes_satellite.txt'),
+                         'data', 'predefined_classes.txt'),
                      argv[3] if len(argv) >= 4 else None)
     win.show()
     return app, win
