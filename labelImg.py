@@ -848,7 +848,7 @@ Ctrl + Shift + F - 适应宽度
         for label, centre_x, centre_y, height, width, angle, line_color, fill_color, difficult in shapes:
             shape = Shape(label=label)
 
-            # If shape origin is within boundaries
+            # 检查中心点是否在图像边界内
             if centre_x > 0 and centre_x < self.canvas.pixmap.width() and centre_y > 0 and centre_y < self.canvas.pixmap.height():
                 shape.origin = [centre_x, centre_y]
                 shape.height = height
@@ -856,9 +856,20 @@ Ctrl + Shift + F - 适应宽度
                 shape.angle = angle
                 shape.difficult = difficult
                 shape.close()
-                if (shape.updatePointsFromOBBInfo(self.canvas.pixmap.width(), self.canvas.pixmap.height())):
+                
+                # 更新点并检查是否在边界内
+                if shape.updatePointsFromOBBInfo(self.canvas.pixmap.width(), self.canvas.pixmap.height()):
+                    # 如果点超出边界，调整到边界内
+                    for i in range(len(shape.points)):
+                        point = shape.points[i]
+                        x = max(0, min(point.x(), self.canvas.pixmap.width()))
+                        y = max(0, min(point.y(), self.canvas.pixmap.height()))
+                        shape.points[i] = QPointF(x, y)
                     self.setDirty()
                     s.append(shape)
+                    print(f"已加载标注: {label} - 中心点({centre_x}, {centre_y}), 尺寸({width}x{height}), 角度{angle}度")
+                else:
+                    print(f"警告: 标注 {label} 超出图像边界，已调整到边界内")
 
             if line_color:
                 shape.line_color = QColor(*line_color)

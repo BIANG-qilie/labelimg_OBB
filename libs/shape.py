@@ -266,6 +266,7 @@ class Shape(object):
                     self.angle = -self.angle
     
     def updatePointsFromOBBInfo(self, canvas_width, canvas_height):
+        # 计算原始顶点
         p = []
         p.append(self.origin[0] + self.height*math.cos(math.radians(self.angle))/2.0 + self.width*math.cos(math.radians(90+self.angle))/2.0)
         p.append(self.origin[1] - self.height*math.sin(math.radians(self.angle))/2.0 - self.width*math.sin(math.radians(90+self.angle))/2.0)
@@ -279,15 +280,109 @@ class Shape(object):
         p.append(self.origin[0] + self.height*math.cos(math.radians(self.angle))/2.0 - self.width*math.cos(math.radians(90+self.angle))/2.0)
         p.append(self.origin[1] - self.height*math.sin(math.radians(self.angle))/2.0 + self.width*math.sin(math.radians(90+self.angle))/2.0)
         
-        # Make sure that all vertices are inside the canvas area
-        if (all([ (p[i]>0 and p[i]<canvas_width) for i in range(0, 8, 2) ]) and all([ (p[i]>0 and p[i]<canvas_height) for i in range(1, 8, 2) ])):
-            self.addPoint(QPointF(p[0], p[1]))
-            self.addPoint(QPointF(p[2], p[3]))
-            self.addPoint(QPointF(p[4], p[5]))
-            self.addPoint(QPointF(p[6], p[7]))
-            return True
-        else:
-            return False
+        # 检查是否有顶点超出边界
+        out_of_bounds = False
+        for i in range(0, 8, 2):
+            if p[i] < 0 or p[i] > canvas_width or p[i+1] < 0 or p[i+1] > canvas_height:
+                out_of_bounds = True
+                break
+        
+        if out_of_bounds:
+            # 如果超出边界，调整中心点位置和边长
+            # 计算当前中心点
+            center_x = sum(p[i] for i in range(0, 8, 2)) / 4
+            center_y = sum(p[i+1] for i in range(0, 8, 2)) / 4
+            
+            # 计算需要移动的距离
+            dx = 0
+            dy = 0
+            
+            if center_x < 0:
+                dx = -center_x
+            elif center_x > canvas_width:
+                dx = canvas_width - center_x
+                
+            if center_y < 0:
+                dy = -center_y
+            elif center_y > canvas_height:
+                dy = canvas_height - center_y
+                
+            # 移动中心点
+            self.origin[0] += dx
+            self.origin[1] += dy
+            
+            # 计算最大可用边长
+            # 计算中心点到各边界的距离
+            dist_left = self.origin[0]
+            dist_right = canvas_width - self.origin[0]
+            dist_top = self.origin[1]
+            dist_bottom = canvas_height - self.origin[1]
+            
+            # 计算在当前角度下可用的最大边长
+            angle_rad = math.radians(self.angle)
+            cos_angle = abs(math.cos(angle_rad))
+            sin_angle = abs(math.sin(angle_rad))
+            
+            # 计算在x和y方向上的最大可用边长
+            max_width_x = min(dist_left, dist_right) * 2
+            max_height_x = min(dist_top, dist_bottom) * 2
+            max_width_y = min(dist_left, dist_right) * 2
+            max_height_y = min(dist_top, dist_bottom) * 2
+            
+            # 根据角度调整最大可用边长
+            if cos_angle > 0:
+                max_width_x /= cos_angle
+                max_height_x /= sin_angle
+            if sin_angle > 0:
+                max_width_y /= sin_angle
+                max_height_y /= cos_angle
+            
+            # 取最小值作为实际最大可用边长
+            max_available_width = min(max_width_x, max_width_y)
+            max_available_height = min(max_height_x, max_height_y)
+            
+            # 保持宽高比调整边长
+            aspect_ratio = self.width / self.height
+            if aspect_ratio > 1:  # 宽度大于高度
+                new_width = min(self.width, max_available_width)
+                new_height = new_width / aspect_ratio
+                if new_height > max_available_height:
+                    new_height = max_available_height
+                    new_width = new_height * aspect_ratio
+            else:  # 高度大于宽度
+                new_height = min(self.height, max_available_height)
+                new_width = new_height * aspect_ratio
+                if new_width > max_available_width:
+                    new_width = max_available_width
+                    new_height = new_width / aspect_ratio
+            
+            self.width = new_width
+            self.height = new_height
+            
+            # 重新计算顶点
+            p = []
+            p.append(self.origin[0] + self.height*math.cos(math.radians(self.angle))/2.0 + self.width*math.cos(math.radians(90+self.angle))/2.0)
+            p.append(self.origin[1] - self.height*math.sin(math.radians(self.angle))/2.0 - self.width*math.sin(math.radians(90+self.angle))/2.0)
+            
+            p.append(self.origin[0] - self.height*math.cos(math.radians(self.angle))/2.0 + self.width*math.cos(math.radians(90+self.angle))/2.0)
+            p.append(self.origin[1] + self.height*math.sin(math.radians(self.angle))/2.0 - self.width*math.sin(math.radians(90+self.angle))/2.0)
+            
+            p.append(self.origin[0] - self.height*math.cos(math.radians(self.angle))/2.0 - self.width*math.cos(math.radians(90+self.angle))/2.0)
+            p.append(self.origin[1] + self.height*math.sin(math.radians(self.angle))/2.0 + self.width*math.sin(math.radians(90+self.angle))/2.0)
+            
+            p.append(self.origin[0] + self.height*math.cos(math.radians(self.angle))/2.0 - self.width*math.cos(math.radians(90+self.angle))/2.0)
+            p.append(self.origin[1] - self.height*math.sin(math.radians(self.angle))/2.0 + self.width*math.sin(math.radians(90+self.angle))/2.0)
+        
+        # 添加点
+        self.points = []  # 清空现有点
+        self.addPoint(QPointF(p[0], p[1]))
+        self.addPoint(QPointF(p[2], p[3]))
+        self.addPoint(QPointF(p[4], p[5]))
+        self.addPoint(QPointF(p[6], p[7]))
+        
+        # 更新OBB信息
+        self.updateOBBInfo()
+        return True
         
     def highlightVertex(self, i, action):
         self._highlightIndex = i
