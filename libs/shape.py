@@ -221,6 +221,10 @@ class Shape(object):
         self.updateOBBInfo()
         
     def rotateBy(self, angle, pixmap_width, pixmap_height):  # Clock-wise
+        # 先记录当前角度
+        current_angle = self.angle
+        
+        # 计算新的点坐标
         new_xs = []
         new_ys = []
         for i in range(4):
@@ -228,12 +232,44 @@ class Shape(object):
             point_y = self.points[i].y()
             new_xs.append(self.origin[0] + math.cos(angle) * (point_x - self.origin[0]) - math.sin(angle) * (point_y - self.origin[1]))
             new_ys.append(self.origin[1] + math.sin(angle) * (point_x - self.origin[0]) + math.cos(angle) * (point_y - self.origin[1]))
+            
+        # 检查是否超出图片边界
         if all((0 <= new_xs[i] <= pixmap_width and 0 <= new_ys[i] <= pixmap_height) for i in range(4)):
+            # 更新点坐标
             for j in range(4):
                 self.points[j].setX(new_xs[j])
                 self.points[j].setY(new_ys[j])
-            self.updateOBBInfo()
-        
+            
+            # 手动更新角度信息
+            new_angle = current_angle + math.degrees(angle)
+            # 标准化角度到 -90 到 90 之间
+            while new_angle > 90:
+                new_angle -= 180
+            while new_angle < -90:
+                new_angle += 180
+            
+            # 更新中心点
+            minX = min([self.points[i].x() for i in range(4)])
+            maxX = max([self.points[i].x() for i in range(4)])
+            minY = min([self.points[i].y() for i in range(4)])
+            maxY = max([self.points[i].y() for i in range(4)])
+            self.origin[0] = minX + (maxX-minX)/2.0
+            self.origin[1] = minY + (maxY-minY)/2.0
+            
+            # 计算宽高
+            val1 = math.sqrt( ((self.points[1].x()-self.points[0].x())**2) + 
+                             ((self.points[1].y()-self.points[0].y())**2) )
+            val2 = math.sqrt( ((self.points[2].x()-self.points[1].x())**2) + 
+                             ((self.points[2].y()-self.points[1].y())**2) )
+            self.height = max([val1, val2])
+            self.width = min([val1, val2])
+            
+            # 最后设置角度，避免被updateOBBInfo覆盖
+            self.angle = new_angle
+            
+            return True
+        return False
+
     def updateOBBInfo(self):
         if (self.reachMaxPoints()):
             # Update Origin (Centre info)
@@ -312,52 +348,26 @@ class Shape(object):
             self.origin[1] += dy
             
             # 计算最大可用边长
-            # 计算中心点到各边界的距离
-            dist_left = self.origin[0]
-            dist_right = canvas_width - self.origin[0]
-            dist_top = self.origin[1]
-            dist_bottom = canvas_height - self.origin[1]
+            max_width = min(canvas_width - self.origin[0], self.origin[0]) * 2
+            max_height = min(canvas_height - self.origin[1], self.origin[1]) * 2
             
-            # 计算在当前角度下可用的最大边长
+            # 根据角度调整边长
             angle_rad = math.radians(self.angle)
             cos_angle = abs(math.cos(angle_rad))
             sin_angle = abs(math.sin(angle_rad))
             
-            # 计算在x和y方向上的最大可用边长
-            max_width_x = min(dist_left, dist_right) * 2
-            max_height_x = min(dist_top, dist_bottom) * 2
-            max_width_y = min(dist_left, dist_right) * 2
-            max_height_y = min(dist_top, dist_bottom) * 2
-            
-            # 根据角度调整最大可用边长
-            if cos_angle > 0:
-                max_width_x /= cos_angle
-                max_height_x /= sin_angle
-            if sin_angle > 0:
-                max_width_y /= sin_angle
-                max_height_y /= cos_angle
-            
-            # 取最小值作为实际最大可用边长
-            max_available_width = min(max_width_x, max_width_y)
-            max_available_height = min(max_height_x, max_height_y)
+            # 计算在当前角度下可用的最大边长
+            max_available_width = min(max_width / cos_angle, max_height / sin_angle)
+            max_available_height = min(max_width / sin_angle, max_height / cos_angle)
             
             # 保持宽高比调整边长
             aspect_ratio = self.width / self.height
             if aspect_ratio > 1:  # 宽度大于高度
-                new_width = min(self.width, max_available_width)
-                new_height = new_width / aspect_ratio
-                if new_height > max_available_height:
-                    new_height = max_available_height
-                    new_width = new_height * aspect_ratio
+                self.width = min(self.width, max_available_width)
+                self.height = self.width / aspect_ratio
             else:  # 高度大于宽度
-                new_height = min(self.height, max_available_height)
-                new_width = new_height * aspect_ratio
-                if new_width > max_available_width:
-                    new_width = max_available_width
-                    new_height = new_width / aspect_ratio
-            
-            self.width = new_width
-            self.height = new_height
+                self.height = min(self.height, max_available_height)
+                self.width = self.height * aspect_ratio
             
             # 重新计算顶点
             p = []
@@ -395,6 +405,9 @@ class Shape(object):
         shape = Shape("%s" % self.label)
         shape.points = [p for p in self.points]
         shape.origin = [p for p in self.origin]
+        shape.angle = self.angle
+        shape.width = self.width
+        shape.height = self.height
         shape.fill = self.fill
         shape.selected = self.selected
         shape._closed = self._closed
@@ -403,6 +416,7 @@ class Shape(object):
         if self.fill_color != Shape.fill_color:
             shape.fill_color = self.fill_color
         shape.difficult = self.difficult
+        shape.paintLabel = self.paintLabel
         return shape
 
     def __len__(self):

@@ -1,4 +1,5 @@
 import math
+import copy  # 添加copy模块
 
 try:
     from PyQt5.QtGui import *
@@ -31,6 +32,7 @@ class Canvas(QWidget):
     selectionChanged = pyqtSignal(bool)
     shapeMoved = pyqtSignal()
     drawingPolygon = pyqtSignal(bool)
+    undoOperation = pyqtSignal()  # 添加撤销信号
 
     CREATE, EDIT = list(range(2))
 
@@ -65,6 +67,16 @@ class Canvas(QWidget):
         self.setFocusPolicy(Qt.WheelFocus)
         self.verified = False
         self.drawSquare = False
+        
+        # 添加状态历史管理
+        self.history = []  # 历史状态列表
+        self.historyIndex = -1  # 当前历史状态索引
+        self.MAX_HISTORY = 30  # 最大历史记录数
+        self.saveTimer = QTimer()  # 定时器用于键盘操作状态保存
+        self.saveTimer.setSingleShot(True)
+        self.saveTimer.timeout.connect(self.saveState)
+        self.currentState = None  # 用于比较状态是否发生变化
+        self.saveInitialState()  # 保存初始状态
 
     def setDrawingColor(self, qColor):
         self.drawingLineColor = qColor
@@ -251,11 +263,16 @@ class Canvas(QWidget):
                 self.overrideCursor(CURSOR_POINT)
             else:
                 self.overrideCursor(CURSOR_GRAB)
+            # 鼠标释放后保存状态
+            self.saveState()
             
         elif ev.button() == Qt.LeftButton:
             pos = self.transformPos(ev.pos())
             if self.drawing():
                 self.handleDrawing(pos)
+                # 绘制完成后保存状态
+                if self.current is None:  # 已完成绘制
+                    self.saveState()
 
     def endMove(self, copy=False):
         assert self.selectedShape and self.selectedShapeCopy
@@ -406,12 +423,16 @@ class Canvas(QWidget):
             angle_target = math.atan2(pos.y() - shape.origin[1], pos.x() - shape.origin[0])
             angle_original = math.atan2(point.y() - shape.origin[1], point.x() - shape.origin[0])
             shape.rotateBy(angle_target-angle_original, self.pixmap.width(), self.pixmap.height())  # Clock-wise
+            # 旋转后保存状态
+            self.saveState()
 
     #  rotate by angle, added
     def rotateShape(self, angle):
         self.selectedShape.rotateBy(angle, self.pixmap.width(), self.pixmap.height())  # Clock-wise
         self.shapeMoved.emit()
         self.repaint()
+        # 直接保存状态而不仅仅启动计时器
+        self.saveState()
 
 
     def boundedMoveShape(self, shape, pos):
@@ -446,10 +467,13 @@ class Canvas(QWidget):
 
     def deleteSelected(self):
         if self.selectedShape:
+            # 删除前保存状态
+            self.saveState()
             shape = self.selectedShape
             self.shapes.remove(self.selectedShape)
             self.selectedShape = None
             self.update()
+            # 删除后不需要再次保存状态，因为已经在前面保存了
             return shape
 
     def copySelectedShape(self):
@@ -460,6 +484,8 @@ class Canvas(QWidget):
             shape.selected = True
             self.selectedShape = shape
             self.boundedShiftShape(shape)
+            # 复制后保存状态
+            self.saveState()
             return shape
 
     def boundedShiftShape(self, shape):
@@ -557,6 +583,8 @@ class Canvas(QWidget):
         self.setHiding(False)
         self.newShape.emit()
         self.update()
+        # 完成一个形状后保存状态
+        self.saveState()
 
     def closeEnough(self, p1, p2):
         #d = distance(p1 - p2)
@@ -675,6 +703,9 @@ class Canvas(QWidget):
             self.rotateShape(-math.pi/36)  # -5 degree
         elif key == Qt.Key_Comma and self.selectedShape:    # 逗号,
             self.rotateShape(math.pi/36)  # 5 degree
+        # 添加Ctrl+Z撤销功能
+        elif ev.modifiers() & Qt.ControlModifier and key == Qt.Key_Z:
+            self.undo()
         '''
         #当前安装PYQT版本不识别括号 https://www.riverbankcomputing.com/static/Docs/PyQt5/search.html?q=qt.key_
         elif key == Qt.Key_BarceLeft and self.selectedShape:    # 大括号
@@ -687,32 +718,41 @@ class Canvas(QWidget):
 
     def moveOnePixel(self, direction):
         # print(self.selectedShape.points)
+        moved = False
         if direction == 'Left' and not self.moveOutOfBound(QPointF(-1.0, 0)):
             # print("move Left one pixel")
             self.selectedShape.points[0] += QPointF(-1.0, 0)
             self.selectedShape.points[1] += QPointF(-1.0, 0)
             self.selectedShape.points[2] += QPointF(-1.0, 0)
             self.selectedShape.points[3] += QPointF(-1.0, 0)
+            moved = True
         elif direction == 'Right' and not self.moveOutOfBound(QPointF(1.0, 0)):
             # print("move Right one pixel")
             self.selectedShape.points[0] += QPointF(1.0, 0)
             self.selectedShape.points[1] += QPointF(1.0, 0)
             self.selectedShape.points[2] += QPointF(1.0, 0)
             self.selectedShape.points[3] += QPointF(1.0, 0)
+            moved = True
         elif direction == 'Up' and not self.moveOutOfBound(QPointF(0, -1.0)):
             # print("move Up one pixel")
             self.selectedShape.points[0] += QPointF(0, -1.0)
             self.selectedShape.points[1] += QPointF(0, -1.0)
             self.selectedShape.points[2] += QPointF(0, -1.0)
             self.selectedShape.points[3] += QPointF(0, -1.0)
+            moved = True
         elif direction == 'Down' and not self.moveOutOfBound(QPointF(0, 1.0)):
             # print("move Down one pixel")
             self.selectedShape.points[0] += QPointF(0, 1.0)
             self.selectedShape.points[1] += QPointF(0, 1.0)
             self.selectedShape.points[2] += QPointF(0, 1.0)
             self.selectedShape.points[3] += QPointF(0, 1.0)
-        self.shapeMoved.emit()
-        self.repaint()
+            moved = True
+        
+        if moved:
+            self.shapeMoved.emit()
+            self.repaint()
+            # 直接保存状态而不仅仅启动计时器
+            self.saveState()
 
     def moveOutOfBound(self, step):
         points = [p1+p2 for p1, p2 in zip(self.selectedShape.points, [step]*4)]
@@ -749,14 +789,26 @@ class Canvas(QWidget):
     def loadPixmap(self, pixmap):
         self.pixmap = pixmap
         self.shapes = []
+        # 重置历史记录
+        self.history = []
+        self.historyIndex = -1
+        self.currentState = None
         self.repaint()
+        # 加载图片后保存初始状态
+        self.saveInitialState()
 
     def loadShapes(self, shapes):
         self.shapes = list(shapes)
         self.current = None
-        for s in shapes:
-            s.updateOBBInfo()
+        # 不再自动更新OBB信息，避免覆盖角度
+        #for s in shapes:
+        #    s.updateOBBInfo()
         self.repaint()
+        # 加载形状后保存初始状态
+        self.history = []
+        self.historyIndex = -1
+        self.currentState = None
+        self.saveInitialState()
 
     def setShapeVisible(self, shape, value):
         self.visible[shape] = value
@@ -781,7 +833,163 @@ class Canvas(QWidget):
     def resetState(self):
         self.restoreCursor()
         self.pixmap = None
+        # 重置历史记录
+        self.history = []
+        self.historyIndex = -1
+        self.currentState = None
         self.update()
 
     def setDrawingShapeToSquare(self, status):
         self.drawSquare = status
+
+    # 添加以下方法用于状态管理和撤销功能
+    def saveInitialState(self):
+        """保存初始状态"""
+        if self.pixmap:
+            self.saveState()
+    
+    def saveState(self):
+        """保存当前状态到历史记录"""
+        if not self.pixmap:
+            return
+            
+        # 创建当前状态的深拷贝
+        state = {
+            'shapes': [s.copy() for s in self.shapes],
+            'current': self.current.copy() if self.current else None,
+            'selectedShape': self.selectedShape,
+            'selectedShapeIndex': self.shapes.index(self.selectedShape) if self.selectedShape else -1
+        }
+        
+        # 保存每个形状的OBB信息
+        for i, shape in enumerate(state['shapes']):
+            shape.updateOBBInfo()  # 确保OBB信息（角度、宽高等）被更新
+        
+        # 判断状态是否发生变化
+        if self.currentState is not None:
+            # 如果形状数量不同，则状态已变化
+            if len(state['shapes']) != len(self.currentState['shapes']):
+                needSave = True
+            else:
+                # 比较每个形状的点和OBB信息是否相同
+                needSave = False
+                for i, shape in enumerate(state['shapes']):
+                    if len(shape.points) != len(self.currentState['shapes'][i].points):
+                        needSave = True
+                        break
+                    
+                    # 检查点坐标
+                    for j, point in enumerate(shape.points):
+                        if (point.x() != self.currentState['shapes'][i].points[j].x() or 
+                            point.y() != self.currentState['shapes'][i].points[j].y()):
+                            needSave = True
+                            break
+                    
+                    # 检查角度和尺寸
+                    if (shape.angle != self.currentState['shapes'][i].angle or
+                        shape.width != self.currentState['shapes'][i].width or
+                        shape.height != self.currentState['shapes'][i].height):
+                        needSave = True
+                        break
+                        
+                    # 检查中心点
+                    if (shape.origin[0] != self.currentState['shapes'][i].origin[0] or
+                        shape.origin[1] != self.currentState['shapes'][i].origin[1]):
+                        needSave = True
+                        break
+                        
+                    if needSave:
+                        break
+        else:
+            needSave = True
+        
+        # 如果状态发生变化，保存到历史记录
+        if needSave:
+            # 防止保存空状态（无任何形状）导致撤销后所有形状消失
+            if len(state['shapes']) == 0 and len(self.history) > 0 and len(self.history[-1]['shapes']) > 0:
+                # 仅当前一个状态有形状而当前状态没有形状时，跳过保存
+                return
+                
+            # 如果当前位置不是最新历史记录，则删除之后的记录
+            if self.historyIndex < len(self.history) - 1:
+                self.history = self.history[:self.historyIndex + 1]
+            
+            # 添加新状态到历史记录
+            self.history.append(state)
+            self.historyIndex = len(self.history) - 1
+            
+            # 如果历史记录超过最大数量，删除最早的记录
+            if len(self.history) > self.MAX_HISTORY:
+                self.history.pop(0)
+                self.historyIndex -= 1
+            
+            # 更新当前状态
+            self.currentState = state
+            
+    def startSaveTimer(self):
+        """启动保存定时器"""
+        self.saveTimer.start(100)  # 100毫秒后保存状态
+    
+    def undo(self):
+        """撤销到上一个状态"""
+        if self.historyIndex > 0:
+            # 先检查当前状态是否需要保存
+            current_shapes_count = len(self.shapes)
+            if current_shapes_count > 0 and self.historyIndex == len(self.history) - 1:
+                # 当前可能有未保存的状态，先保存
+                self.saveState()
+                
+            self.historyIndex -= 1
+            state = self.history[self.historyIndex]
+            
+            # 额外检查：如果撤销会导致所有形状消失，且不是第一个状态，则跳过
+            if len(state['shapes']) == 0 and self.historyIndex > 0:
+                self.historyIndex -= 1
+                state = self.history[self.historyIndex]
+                
+            self.restoreState(state)
+            self.undoOperation.emit()
+            return True
+        return False
+    
+    def restoreState(self, state):
+        """恢复到指定状态"""
+        # 保存当前标签以便恢复
+        shape_labels = {}
+        for shape in self.shapes:
+            if shape.label:
+                shape_labels[id(shape)] = shape.label
+                
+        # 从状态恢复形状
+        self.shapes = []
+        for s in state['shapes']:
+            # 完全复制形状，但不要重新计算OBB信息
+            new_shape = s.copy()
+            # 确保角度信息被正确保存
+            new_shape.angle = s.angle
+            new_shape.width = s.width
+            new_shape.height = s.height
+            new_shape.origin = [o for o in s.origin]
+            
+            # 强制使用OBB信息重新计算点的位置
+            # 这样可以确保视觉显示的角度与保存的角度一致
+            if self.pixmap:
+                new_shape.updatePointsFromOBBInfo(self.pixmap.width(), self.pixmap.height())
+                
+            self.shapes.append(new_shape)
+        
+        # 尝试恢复标签
+        for i, shape in enumerate(self.shapes):
+            # 保持形状的属性，比如标签
+            if state['shapes'][i].label:
+                shape.label = state['shapes'][i].label
+                
+        self.current = state['current'].copy() if state['current'] else None
+        
+        self.selectedShape = None
+        if state['selectedShapeIndex'] >= 0 and state['selectedShapeIndex'] < len(self.shapes):
+            self.selectedShape = self.shapes[state['selectedShapeIndex']]
+            self.selectedShape.selected = True
+            
+        self.update()
+        

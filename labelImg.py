@@ -183,6 +183,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.canvas = Canvas(parent=self)
         self.canvas.zoomRequest.connect(self.zoomRequest)
         self.canvas.setDrawingShapeToSquare(settings.get(SETTING_DRAW_SQUARE, False))
+        self.canvas.undoOperation.connect(self.undoOperation)   # 连接撤销信号
 
         scroll = QScrollArea()
         scroll.setWidget(self.canvas)
@@ -209,59 +210,64 @@ class MainWindow(QMainWindow, WindowMixin):
 
         # Actions
         action = partial(newAction, self)
-        quit = action(getStr('quit'), self.close,
-                      'Ctrl+Q', 'quit', getStr('quitApp'))
+        quit = action('&退出', self.close,
+                      'Ctrl+Q', 'quit', u'退出应用')
 
-        open = action(getStr('openFile'), self.openFile,
-                      'Ctrl+O', 'open', getStr('openFileDetail'))
+        open = action('&打开', self.openFile,
+                      'Ctrl+O', 'open', u'打开一个文件')
 
-        opendir = action(getStr('openDir'), self.openDirDialog,
-                         'Ctrl+u', 'open', getStr('openDir'))
+        opendir = action('&打开目录', self.openDirDialog,
+                         'Ctrl+u', 'open', u'打开包含图像的目录')
 
-        changeSavedir = action(getStr('changeSaveDir'), self.changeSavedirDialog,
-                               'Ctrl+r', 'open', getStr('changeSavedAnnotationDir'))
+        changeSavedir = action('&改变存储目录',
+                               self.changeSavedirDialog,
+                               'Ctrl+r', 'open', u'改变默认存储目录')
 
-        openAnnotation = action(getStr('openAnnotation'), self.openAnnotationDialog,
-                                'Ctrl+Shift+O', 'open', getStr('openAnnotationDetail'))
+        openAnnotation = action('&打开标注文件', self.openAnnotationDialog,
+                                'Ctrl+Shift+O', 'open', u'打开一个标注文件')
 
-        openNextImg = action(getStr('nextImg'), self.openNextImg,
-                             'd', 'next', getStr('nextImgDetail'))
+        openNextImg = action('&下一张图片', self.openNextImg,
+                             'd', 'next', u'打开下一张图片')
 
-        openPrevImg = action(getStr('prevImg'), self.openPrevImg,
-                             'a', 'prev', getStr('prevImgDetail'))
-        #  no action
-        verify = action(getStr('verifyImg'), self.verifyImg,
-                        'space', 'verify', getStr('verifyImgDetail'))
+        openPrevImg = action('&前一张图片', self.openPrevImg,
+                             'a', 'prev', u'打开前一张图片')
 
-        save = action(getStr('save'), self.saveFile,
-                      'Ctrl+S', 'save', getStr('saveDetail'), enabled=False)
+        verify = action('&验证图片', self.verifyImg,
+                       'space', 'verify', u'验证图片')
 
-        save_format = action('&YOLO_OBB', self.change_format,
-                      'Ctrl+', 'format_yolo_obb', getStr('changeSaveFormat'), enabled=True)
+        save = action('&保存', self.saveFile,
+                      'Ctrl+S', 'save', u'保存标注文件', enabled=False)
 
-        saveAs = action(getStr('saveAs'), self.saveFileAs,
-                        'Ctrl+Shift+S', 'save-as', getStr('saveAsDetail'), enabled=False)
+        save_format = action('&保存为YOLO_OBB格式', self.change_format,
+                           None, 'format_YOLO_OBB', u'保存为YOLO_OBB格式')
 
-        close = action(getStr('closeCur'), self.closeFile, 'Ctrl+W', 'close', getStr('closeCurDetail'))
+        saveAs = action('&另存为', self.saveFileAs,
+                        'Ctrl+Shift+S', 'save-as', u'指定位置另存标签文件')
 
-        resetAll = action(getStr('resetAll'), self.resetAll, None, 'resetall', getStr('resetAllDetail'))
+        close = action('&关闭', self.closeFile, 'Ctrl+W', 'close', u'关闭当前文件')
 
-        color1 = action(getStr('boxLineColor'), self.chooseColor1,
-                        'Ctrl+L', 'color_line', getStr('boxLineColorDetail'))
+        resetAll = action('&重置所有', self.resetAll, None, 'resetall', u'重置所有')
 
-        createMode = action(getStr('crtBox'), self.setCreateMode,
-                            'w', 'new', getStr('crtBoxDetail'), enabled=False)
-        editMode = action('&Edit\nRectBox', self.setEditMode,
-                          'Ctrl+J', 'edit', u'Move and edit Boxs', enabled=False)
-        # 重复定义w
-        create = action(getStr('crtBox'), self.createShape,
-                        'w', 'new', getStr('crtBoxDetail'), enabled=False)
+        color1 = action('线条颜色', self.chooseColor1,
+                        'Ctrl+L', 'color_line', u'选择线条颜色')
 
-        delete = action(getStr('delBox'), self.deleteSelectedShape,
-                        'Delete', 'delete', getStr('delBoxDetail'), enabled=False)
-        copy = action(getStr('dupBox'), self.copySelectedShape,
-                      'Ctrl+D', 'copy', getStr('dupBoxDetail'),
-                      enabled=False)
+        createMode = action('创建模式', self.setCreateMode,
+                            'Ctrl+J', 'new', u'创建方框')
+
+        editMode = action('编辑模式', self.setEditMode,
+                         'Ctrl+J', 'edit', u'移动和编辑方框', enabled=False)
+
+        create = action('创建方框', self.createShape,
+                        'w', 'new', u'创建旋转框', enabled=False)
+
+        delete = action('删除方框', self.deleteSelectedShape,
+                        'Delete', 'delete', u'删除', enabled=False)
+
+        copy = action('拷贝方框', self.copySelectedShape,
+                      'Ctrl+C', 'copy', u'拷贝', enabled=False)
+                      
+        undo = action('撤销', self.undoLastOperation,
+                     'Ctrl+Z', 'undo', u'撤销上一步操作')
 
         advancedMode = action(getStr('advancedMode'), self.toggleAdvancedMode,
                               'Ctrl+Shift+A', 'expert', getStr('advancedModeDetail'),
@@ -358,7 +364,8 @@ class MainWindow(QMainWindow, WindowMixin):
                                                delete, shapeLineColor, shapeFillColor),
                               onLoadActive=(
                                   close, create, createMode, editMode),
-                              onShapesPresent=(saveAs, hideAll, showAll))
+                              onShapesPresent=(saveAs, hideAll, showAll),
+                              undo=undo)
 
         self.menus = struct(
             file=self.menu('&File'),
@@ -407,12 +414,12 @@ class MainWindow(QMainWindow, WindowMixin):
 
         self.tools = self.toolbar('Tools')
         self.actions.beginner = (
-            open, opendir, changeSavedir, openNextImg, openPrevImg, verify, save, save_format, None, create, copy, delete, None,
+            open, opendir, changeSavedir, openNextImg, openPrevImg, verify, save, save_format, None, create, copy, delete, undo, None,
             zoomIn, zoom, zoomOut, fitWindow, fitWidth)
 
         self.actions.advanced = (
             open, opendir, changeSavedir, openNextImg, openPrevImg, save, save_format, None,
-            createMode, editMode, None,
+            createMode, editMode, None, undo, 
             hideAll, showAll)
 
         self.statusBar().showMessage('%s started.' % __appname__)
@@ -653,6 +660,7 @@ class MainWindow(QMainWindow, WindowMixin):
 标注操作：
 W - 创建旋转矩形框
 Ctrl + J - 编辑模式
+Ctrl + Z - 撤销上一步操作
 
 旋转矩形框操作：
 O - 顺时针旋转0.1度
@@ -1615,6 +1623,37 @@ Ctrl + Shift + F - 适应宽度
 
     def toogleDrawSquare(self):
         self.canvas.setDrawingShapeToSquare(self.drawSquaresOption.isChecked())
+
+    def undoOperation(self):
+        """响应Canvas的撤销操作信号"""
+        # 更新界面相关状态
+        # 获取当前所有形状
+        shapes = self.canvas.shapes
+        
+        # 检查是否有形状
+        if not shapes:
+            # 如果没有形状，可能是误操作导致全部删除
+            self.errorMessage("撤销警告", "撤销操作后没有任何标注框，请检查是否误操作。")
+            return
+            
+        # 清除当前标签列表
+        self.labelList.clear()
+        self.itemsToShapes.clear()
+        self.shapesToItems.clear()
+        
+        # 直接使用形状对象添加到标签列表，而不是尝试解包
+        for shape in shapes:
+            self.addLabel(shape)
+            
+        self.setDirty()
+        self.paintCanvas()
+
+    def undoLastOperation(self):
+        """撤销上一步操作"""
+        if self.canvas.undo():
+            # 撤销成功
+            self.setDirty()
+            
 
 def inverted(color):
     return QColor(*[255 - v for v in color.getRgb()])
