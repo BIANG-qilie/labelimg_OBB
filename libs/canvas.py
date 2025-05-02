@@ -71,7 +71,7 @@ class Canvas(QWidget):
         # 添加状态历史管理
         self.history = []  # 历史状态列表
         self.historyIndex = -1  # 当前历史状态索引
-        self.MAX_HISTORY = 30  # 最大历史记录数
+        self.MAX_HISTORY = 100  # 最大历史记录数
         self.saveTimer = QTimer()  # 定时器用于键盘操作状态保存
         self.saveTimer.setSingleShot(True)
         self.saveTimer.timeout.connect(self.saveState)

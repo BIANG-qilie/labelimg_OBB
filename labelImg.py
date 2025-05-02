@@ -92,8 +92,10 @@ class MainWindow(QMainWindow, WindowMixin):
         settings = self.settings
 
         # Load string bundle for i18n
-        self.stringBundle = StringBundle.getBundle()
-        getStr = lambda strId: self.stringBundle.getString(strId)
+        language = settings.get(SETTING_LANGUAGE, None)
+        self.stringBundle = StringBundle.getBundle(language)
+        self.getStr = lambda strId: self.stringBundle.getString(strId)
+        getStr = self.getStr
 
         # Save as Pascal voc xml
         self.defaultSaveDir = defaultSaveDir
@@ -210,80 +212,80 @@ class MainWindow(QMainWindow, WindowMixin):
 
         # Actions
         action = partial(newAction, self)
-        quit = action('&退出', self.close,
-                      'Ctrl+Q', 'quit', u'退出应用')
+        quit = action('&' + getStr('quit'), self.close,
+                      'Ctrl+Q', 'quit', getStr('quitApp'))
 
-        open = action('&打开', self.openFile,
-                      'Ctrl+O', 'open', u'打开一个文件')
+        open = action('&' + getStr('openFile'), self.openFile,
+                      'Ctrl+O', 'open', getStr('openFileDetail'))
 
-        opendir = action('&打开目录', self.openDirDialog,
-                         'Ctrl+u', 'open', u'打开包含图像的目录')
+        opendir = action('&' + getStr('openDir'), self.openDirDialog,
+                         'Ctrl+u', 'open', getStr('openDir'))
 
-        changeSavedir = action('&改变存储目录',
+        changeSavedir = action('&' + getStr('changeSaveDir'),
                                self.changeSavedirDialog,
-                               'Ctrl+r', 'open', u'改变默认存储目录')
+                               'Ctrl+r', 'open', getStr('changeSaveDir'))
 
-        openAnnotation = action('&打开标注文件', self.openAnnotationDialog,
-                                'Ctrl+Shift+O', 'open', u'打开一个标注文件')
+        openAnnotation = action('&' + getStr('openAnnotation'), self.openAnnotationDialog,
+                                'Ctrl+Shift+O', 'open', getStr('openAnnotationDetail'))
 
-        openNextImg = action('&下一张图片', self.openNextImg,
-                             'd', 'next', u'打开下一张图片')
+        openNextImg = action('&' + getStr('nextImg'), self.openNextImg,
+                             'd', 'next', getStr('nextImgDetail'))
 
-        openPrevImg = action('&前一张图片', self.openPrevImg,
-                             'a', 'prev', u'打开前一张图片')
+        openPrevImg = action('&' + getStr('prevImg'), self.openPrevImg,
+                             'a', 'prev', getStr('prevImgDetail'))
 
-        verify = action('&验证图片', self.verifyImg,
-                       'space', 'verify', u'验证图片')
+        verify = action('&' + getStr('verifyImg'), self.verifyImg,
+                       'space', 'verify', getStr('verifyImgDetail'))
 
-        save = action('&保存', self.saveFile,
-                      'Ctrl+S', 'save', u'保存标注文件', enabled=False)
+        save = action('&' + getStr('save'), self.saveFile,
+                      'Ctrl+S', 'save', getStr('saveDetail'), enabled=False)
 
-        save_format = action('&保存为YOLO_OBB格式', self.change_format,
-                           None, 'format_YOLO_OBB', u'保存为YOLO_OBB格式')
+        save_format = action('&' + getStr('changeSaveFormat'), self.change_format,
+                           None, 'format_YOLO_OBB', getStr('changeSaveFormat'))
 
-        saveAs = action('&另存为', self.saveFileAs,
-                        'Ctrl+Shift+S', 'save-as', u'指定位置另存标签文件')
+        saveAs = action('&' + getStr('saveAs'), self.saveFileAs,
+                        'Ctrl+Shift+S', 'save-as', getStr('saveAsDetail'))
 
-        close = action('&关闭', self.closeFile, 'Ctrl+W', 'close', u'关闭当前文件')
+        close = action('&' + getStr('closeCur'), self.closeFile, 'Ctrl+W', 'close', getStr('closeCurDetail'))
 
-        resetAll = action('&重置所有', self.resetAll, None, 'resetall', u'重置所有')
+        resetAll = action('&' + getStr('resetAll'), self.resetAll, None, 'resetall', getStr('resetAllDetail'))
 
-        color1 = action('线条颜色', self.chooseColor1,
-                        'Ctrl+L', 'color_line', u'选择线条颜色')
+        color1 = action(getStr('boxLineColor'), self.chooseColor1,
+                        'Ctrl+L', 'color_line', getStr('boxLineColorDetail'))
 
-        createMode = action('创建模式', self.setCreateMode,
-                            'Ctrl+J', 'new', u'创建方框')
+        createMode = action(getStr('createMode'), self.setCreateMode,
+                            'Ctrl+J', 'new', getStr('createModeDetail'))
 
-        editMode = action('编辑模式', self.setEditMode,
-                         'Ctrl+J', 'edit', u'移动和编辑方框', enabled=False)
+        editMode = action(getStr('editMode'), self.setEditMode,
+                         'Ctrl+J', 'edit', getStr('editModeDetail'), enabled=False)
 
-        create = action('创建方框', self.createShape,
-                        'w', 'new', u'创建旋转框', enabled=False)
+        create = action(getStr('crtBox'), self.createShape,
+                        'w', 'new', getStr('crtBoxDetail'), enabled=False)
 
-        delete = action('删除方框', self.deleteSelectedShape,
-                        'Delete', 'delete', u'删除', enabled=False)
+        delete = action(getStr('delBox'), self.deleteSelectedShape,
+                        'Delete', 'delete', getStr('delBoxDetail'), enabled=False)
 
-        copy = action('拷贝方框', self.copySelectedShape,
-                      'Ctrl+C', 'copy', u'拷贝', enabled=False)
+        copy = action(getStr('dupBox'), self.copySelectedShape,
+                      'Ctrl+C', 'copy', getStr('dupBoxDetail'), enabled=False)
                       
-        undo = action('撤销', self.undoLastOperation,
-                     'Ctrl+Z', 'undo', u'撤销上一步操作')
+        undo = action(getStr('undo'), self.undoLastOperation,
+                     'Ctrl+Z', 'undo', getStr('undoDetail'))
 
         advancedMode = action(getStr('advancedMode'), self.toggleAdvancedMode,
                               'Ctrl+Shift+A', 'expert', getStr('advancedModeDetail'),
                               checkable=True)
 
-        hideAll = action('&Hide\nRectBox', partial(self.togglePolygons, False),
+        hideAll = action('&' + getStr('hideAllBoxDetail'), partial(self.togglePolygons, False),
                          'Ctrl+H', 'hide', getStr('hideAllBoxDetail'),
                          enabled=False)
-        showAll = action('&Show\nRectBox', partial(self.togglePolygons, True),
+        showAll = action('&' + getStr('showAllBoxDetail'), partial(self.togglePolygons, True),
                          'Ctrl+A', 'hide', getStr('showAllBoxDetail'),
                          enabled=False)
 
         showQuickInstr = action(getStr('quickinstr'), self.showQuickInstrDialog, None, 'help', getStr('quickinstr'))
         help = action(getStr('tutorial'), self.showTutorialDialog, None, 'help', getStr('tutorialDetail'))
         showInfo = action(getStr('info'), self.showInfoDialog, None, 'help', getStr('info'))
-        showShortcuts = action('快捷键说明', self.showShortcutsDialog, None, 'help', '显示所有快捷键说明')
+        showShortcuts = action(getStr('shortcuts'), self.showShortcutsDialog, None, 'help', getStr('shortcutsDetail'))
 
         zoom = QWidgetAction(self)
         zoom.setDefaultWidget(self.zoomWidget)
@@ -368,11 +370,11 @@ class MainWindow(QMainWindow, WindowMixin):
                               undo=undo)
 
         self.menus = struct(
-            file=self.menu('&File'),
-            edit=self.menu('&Edit'),
-            view=self.menu('&View'),
-            help=self.menu('&Help'),
-            recentFiles=QMenu('Open &Recent'),
+            file=self.menu('&' + getStr('fileMenu')),
+            edit=self.menu('&' + getStr('editMenu')),
+            view=self.menu('&' + getStr('viewMenu')),
+            help=self.menu('&' + getStr('helpMenu')),
+            recentFiles=QMenu(getStr('openRecent')),
             labelList=labelMenu)
 
         # Auto saving : Enable auto saving if pressing next
@@ -392,8 +394,11 @@ class MainWindow(QMainWindow, WindowMixin):
         self.displayLabelOption.setChecked(settings.get(SETTING_PAINT_LABEL, False))
         self.displayLabelOption.triggered.connect(self.togglePaintLabelsOption)
 
+        preferences = action(getStr('preference'), self.openPreferences,
+                            None, 'preference', getStr('preferenceDetail'))
+
         addActions(self.menus.file,
-                   (open, opendir, changeSavedir, openAnnotation, self.menus.recentFiles, save, save_format, saveAs, close, resetAll, quit))
+                   (open, opendir, changeSavedir, openAnnotation, self.menus.recentFiles, save, save_format, saveAs, close, None, preferences, None, resetAll, quit))
         addActions(self.menus.help, (showQuickInstr, help, showInfo, showShortcuts))
         addActions(self.menus.view, (
             self.autoSaving,
@@ -409,10 +414,10 @@ class MainWindow(QMainWindow, WindowMixin):
         # Custom context menu for the canvas widget:
         addActions(self.canvas.menus[0], self.actions.beginnerContext)
         addActions(self.canvas.menus[1], (
-            action('&Copy here', self.copyShape),
-            action('&Move here', self.moveShape)))
+            action('&' + getStr('dupBox'), self.copyShape),
+            action('&' + getStr('moveBox'), self.moveShape)))
 
-        self.tools = self.toolbar('Tools')
+        self.tools = self.toolbar(getStr('toolsMenu'))
         self.actions.beginner = (
             open, opendir, changeSavedir, openNextImg, openPrevImg, verify, save, save_format, None, create, copy, delete, undo, None,
             zoomIn, zoom, zoomOut, fitWindow, fitWidth)
@@ -644,48 +649,20 @@ class MainWindow(QMainWindow, WindowMixin):
     ## Callbacks ##
     def showQuickInstrDialog(self):
         msg = "Left Click & Drag to create object. Left Click to move it. Left Click points to resize it. Right Click points to rotate it."
-        QMessageBox.information(self, u'Quick Instructions', msg)
+        QMessageBox.information(self, self.stringBundle.getString('quickInstructionsTitle'), msg)
         
     def showTutorialDialog(self):
         subprocess.Popen(self.screencastViewer + [self.screencast])
 
     def showInfoDialog(self):
         msg = u'Name:{0} \nApp Version:{1} \n{2} '.format(__appname__, __version__, sys.version_info)
-        QMessageBox.information(self, u'Information', msg)
+        QMessageBox.information(self, self.stringBundle.getString('informationTitle'), msg)
 
     def showShortcutsDialog(self):
-        msg = u'''
-快捷键说明：
-
-标注操作：
-W - 创建旋转矩形框
-Ctrl + J - 编辑模式
-Ctrl + Z - 撤销上一步操作
-
-旋转矩形框操作：
-O - 顺时针旋转0.1度
-P - 逆时针旋转0.1度
-K - 顺时针旋转1度
-L - 逆时针旋转1度
-M - 顺时针旋转5度
-, - 逆时针旋转5度
-
-图像导航：
-D - 下一张图像
-A - 上一张图像
-Space - 将当前图像标记为已验证
-
-缩放控制：
-Ctrl + + - 放大
-Ctrl + - - 缩小
-Ctrl + = - 原始大小
-Ctrl + F - 适应窗口
-Ctrl + Shift + F - 适应宽度
-
-其他：
-方向键 - 移动选中的矩形框
-'''
-        QMessageBox.information(self, u'快捷键说明', msg)
+        msg = self.stringBundle.getString('shortcutsContent')
+        # 手动替换\n为实际的换行符
+        msg = msg.replace('\\n', '\n')
+        QMessageBox.information(self, self.stringBundle.getString('shortcutsTitle'), msg)
 
     def createShape(self):
         assert self.beginner()
@@ -943,7 +920,7 @@ Ctrl + Shift + F - 适应宽度
             print('Image:{0} -> Annotation:{1}'.format(self.filePath, annotationFilePath))
             return True
         except LabelFileError as e:
-            self.errorMessage(u'Error saving label data', u'<b>%s</b>' % e)
+            self.errorMessage(self.stringBundle.getString('errorSavingLabel'), u'<b>%s</b>' % e)
             return False
 
     def copySelectedShape(self):
@@ -1128,10 +1105,8 @@ Ctrl + Shift + F - 适应宽度
                 try:
                     self.labelFile = LabelFile(unicodeFilePath)
                 except LabelFileError as e:
-                    self.errorMessage(u'Error opening file',
-                                      (u"<p><b>%s</b></p>"
-                                       u"<p>Make sure <i>%s</i> is a valid label file.")
-                                      % (e, unicodeFilePath))
+                    self.errorMessage(self.stringBundle.getString('errorOpeningFile'),
+                                      self.stringBundle.getString('errorOpeningFileDetail') % unicodeFilePath)
                     self.status("Error reading %s" % unicodeFilePath)
                     return False
                 self.imageData = self.labelFile.imageData
@@ -1147,8 +1122,8 @@ Ctrl + Shift + F - 适应宽度
 
             image = QImage.fromData(self.imageData)
             if image.isNull():
-                self.errorMessage(u'Error opening file',
-                                  u"<p>Make sure <i>%s</i> is a valid image file." % unicodeFilePath)
+                self.errorMessage(self.stringBundle.getString('errorOpeningFile'),
+                                  self.stringBundle.getString('errorOpeningFileDetail') % unicodeFilePath)
                 self.status("Error reading %s" % unicodeFilePath)
                 return False
             self.status("Loaded %s" % os.path.basename(unicodeFilePath))
@@ -1633,7 +1608,7 @@ Ctrl + Shift + F - 适应宽度
         # 检查是否有形状
         if not shapes:
             # 如果没有形状，可能是误操作导致全部删除
-            self.errorMessage("撤销警告", "撤销操作后没有任何标注框，请检查是否误操作。")
+            self.errorMessage(self.stringBundle.getString('undoWarning'), self.stringBundle.getString('undoWarningDetail'))
             return
             
         # 清除当前标签列表
@@ -1654,6 +1629,80 @@ Ctrl + Shift + F - 适应宽度
             # 撤销成功
             self.setDirty()
             
+    def openPreferences(self):
+        dialog = PreferencesDialog(self)
+        if dialog.exec_():
+            # 若用户点击确定，应用语言更改
+            selectedLanguage = dialog.getSelectedLanguage()
+            if selectedLanguage != self.settings.get(SETTING_LANGUAGE):
+                self.settings[SETTING_LANGUAGE] = selectedLanguage
+                self.settings.save()
+                # 更新界面语言
+                self.stringBundle = StringBundle.getBundle(selectedLanguage)
+                # 显示重启应用程序的提示
+                QMessageBox.information(self, self.stringBundle.getString('preference'),
+                                        self.stringBundle.getString('languageChangedPrompt'))
+
+# 添加首选项对话框
+class PreferencesDialog(QDialog):
+    def __init__(self, parent=None):
+        super(PreferencesDialog, self).__init__(parent)
+        self.parent = parent
+        self.settings = parent.settings
+        self.stringBundle = parent.stringBundle
+        self.setWindowTitle(self.stringBundle.getString('preference'))
+        self.resize(300, 200)
+        
+        self.initUI()
+        
+    def initUI(self):
+        layout = QVBoxLayout()
+        
+        # 语言选择组
+        languageGroup = QGroupBox(self.stringBundle.getString('language'))
+        languageLayout = QVBoxLayout()
+        
+        # 创建语言选择按钮
+        self.englishRadio = QRadioButton('English')
+        self.simplifiedChineseRadio = QRadioButton('简体中文')
+        self.traditionalChineseRadio = QRadioButton('繁體中文')
+        
+        # 根据当前设置选择相应的按钮
+        currentLanguage = self.settings.get(SETTING_LANGUAGE, LANGUAGE_ENGLISH)
+        if currentLanguage == LANGUAGE_ENGLISH:
+            self.englishRadio.setChecked(True)
+        elif currentLanguage == LANGUAGE_CHINESE_SIMPLIFIED:
+            self.simplifiedChineseRadio.setChecked(True)
+        elif currentLanguage == LANGUAGE_CHINESE_TRADITIONAL:
+            self.traditionalChineseRadio.setChecked(True)
+        else:
+            # 默认英语
+            self.englishRadio.setChecked(True)
+            
+        # 添加到布局
+        languageLayout.addWidget(self.englishRadio)
+        languageLayout.addWidget(self.simplifiedChineseRadio)
+        languageLayout.addWidget(self.traditionalChineseRadio)
+        languageGroup.setLayout(languageLayout)
+        
+        # 添加按钮
+        buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttonBox.accepted.connect(self.accept)
+        buttonBox.rejected.connect(self.reject)
+        
+        layout.addWidget(languageGroup)
+        layout.addWidget(buttonBox)
+        
+        self.setLayout(layout)
+        
+    def getSelectedLanguage(self):
+        if self.englishRadio.isChecked():
+            return LANGUAGE_ENGLISH
+        elif self.simplifiedChineseRadio.isChecked():
+            return LANGUAGE_CHINESE_SIMPLIFIED
+        elif self.traditionalChineseRadio.isChecked():
+            return LANGUAGE_CHINESE_TRADITIONAL
+        return LANGUAGE_ENGLISH
 
 def inverted(color):
     return QColor(*[255 - v for v in color.getRgb()])

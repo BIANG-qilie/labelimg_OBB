@@ -6,6 +6,7 @@ import os
 import sys
 import locale
 from libs.ustr import ustr
+from libs.constants import LANGUAGE_ENGLISH
 
 try:
     from PyQt5.QtCore import *
@@ -19,10 +20,16 @@ except ImportError:
 class StringBundle:
 
     __create_key = object()
+    __instance = None
 
     def __init__(self, create_key, localeStr):
         assert(create_key == StringBundle.__create_key), "StringBundle must be created using StringBundle.getBundle"
         self.idToMessage = {}
+        self.localeStr = localeStr
+        self.loadBundle(localeStr)
+        
+    def loadBundle(self, localeStr):
+        self.idToMessage = {}  # 清空之前的消息
         paths = self.__createLookupFallbackList(localeStr)
         for path in paths:
             self.__loadBundle(path)
@@ -35,8 +42,15 @@ class StringBundle:
                     locale.getlocale()) > 0 else os.getenv('LANG')
             except:
                 print('Invalid locale')
-                localeStr = 'en'
-        return StringBundle(cls.__create_key, localeStr)
+                localeStr = LANGUAGE_ENGLISH
+        
+        if cls.__instance is None:
+            cls.__instance = StringBundle(cls.__create_key, localeStr)
+        elif localeStr != cls.__instance.localeStr:
+            cls.__instance.loadBundle(localeStr)
+            cls.__instance.localeStr = localeStr
+            
+        return cls.__instance
 
     def getString(self, stringId):
         assert(stringId in self.idToMessage), "Missing string id : " + stringId
