@@ -2,6 +2,18 @@
 History
 =======
 
+1.8.2 (2025-05-02)
+------------------
+English：
+* Add language selection support (English, Simplified Chinese, Traditional Chinese)
+* Add shortcut keys
+* Add history, can Ctrl+Z to undo
+
+Chinese：
+* 添加语言选择支持（简体中文、繁体中文、英语）
+* 添加快捷键操作
+* 添加历史记录，可以进Ctrl+Z回撤
+
 1.8.1 (2018-12-02)
 ------------------
 
