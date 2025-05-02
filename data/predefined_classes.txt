@@ -1,6 +1,6 @@
 pedestrian
-two-wheelers
-three-wheelers
+two-wheeler
+three-wheeler
 small-vehicle
 bus
 articulated-truck-tractor
