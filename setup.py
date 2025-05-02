@@ -12,7 +12,9 @@ with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
 requirements = [
-    # TODO: Different OS have different requirements
+    'lxml>=4.9.1',
+    'numpy>=1.19.5',
+    'PyQt5>=5.15.6',
 ]
 
 # OS specific settings
@@ -35,13 +37,12 @@ OPTIONS = {
 
 setup(
     app=APP,
-    name='labelImg',
+    name='labelImg OBB',
     version=__version__,
-    description="LabelImg is a graphical image annotation tool and label object bounding boxes in images",
+    description="LabelImg OBB is a graphical image annotation tool for creating oriented bounding boxes (OBB) with multi-language support. It's an enhanced version of LabelImg with rotation support and Chinese interface.",
     long_description=readme + '\n\n' + history,
-    author="TzuTa Lin",
-    author_email='tzu.ta.lin@gmail.com',
-    url='https://github.com/tzutalin/labelImg',
+    author="TzuTa Lin，heshameraql，hahakid，Blake Zhu",
+    url='https://github.com/BIANG-qilie/labelimg_OBB',
     package_dir={'labelImg': '.'},
     packages=required_packages,
     entry_points={
@@ -58,17 +59,11 @@ setup(
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
-        'Natural Language :: English',
-        "Programming Language :: Python :: 2",
-        'Programming Language :: Python :: 2.6',
-        'Programming Language :: Python :: 2.7',
+        'Natural Language :: English，Simplified Chinese，Traditional Chinese',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
     ],
     package_data={'data/predefined_classes.txt': ['data/predefined_classes.txt']},
     options={'py2app': OPTIONS},
-    setup_requires= SET_REQUIRES
+    setup_requires=SET_REQUIRES
 )

@@ -1,36 +1,74 @@
-# labelimg_OBB_shortcut
-refer https://github.com/heshameraqi/labelImg_OBB for installation.
-Or tested envs (ubuntu18.04, anaconda, python3.8) as follow:
-  1. install pyqt5: sudo apt-get install pyqt5-dev-tools
-  2. pip install -r requirements/requirements-linux-python3.txt
-  3. make qt5py3
-  4. start labeling: python3 labelImg.py
+# LabelImg OBB (Oriented Bounding Box)
 
+一个用于创建和标注旋转边界框(OBB)的图形化标注工具。本项目基于 [labelImg_OBB](https://github.com/heshameraqi/labelImg_OBB) 修改，增加了快捷键操作和中文支持。
 
+## 功能特点
 
-With keyboard shortcut for fast fine tuning the labels.
+- 支持旋转边界框(OBB)标注
+- 支持多语言界面(英语、简体中文、繁体中文)
+- 丰富的快捷键操作
+- 实时显示边界框面积和角度
+- 支持标注历史记录(最多30步)
+- 支持YOLO OBB格式导出
 
-w = add new bbox
+## 安装说明
 
-ctrl+j = edit mode
+### 环境安装
+1. 使用 conda 创建环境:
+```bash
+conda env create -f requirement/labelimgOBB.yml
+```
 
-direction key = translation bbox
+2. 激活环境:
+```bash
+conda activate labelimgOBB
+```
 
-# added
+3. 启动程序:
+```bash
+python labelImg.py
+```
 
-rotation bbox:
+## 快捷键说明
 
-  o = +0.1
-  
-  p = -0.1
-  
-  k = +1
-  
-  l = -1
-  
-  m = +5
-  
-  , = -5
+### 基本操作
+- `W` - 创建新的旋转边界框
+- `Ctrl+J` - 切换编辑模式
+- `Ctrl+Z` - 撤销上一步操作
+- 方向键 - 移动选中的边界框
 
-For small scale data, use 1/3/5 degree labeling is sufficient enough (modify libs/canvas_shortcut.py).
-Directly show the area of current bbox and angle instead of [width, height], because we need the smallest label.
+### 旋转操作
+- `O` - 顺时针旋转 0.1 度
+- `P` - 逆时针旋转 0.1 度
+- `K` - 顺时针旋转 1 度
+- `L` - 逆时针旋转 1 度
+- `M` - 顺时针旋转 5 度
+- `,` - 逆时针旋转 5 度
+
+### 图像导航
+- `D` - 下一张图片
+- `A` - 上一张图片
+- `Space` - 验证当前图片
+
+### 视图控制
+- `Ctrl++` - 放大
+- `Ctrl+-` - 缩小
+- `Ctrl+=` - 原始大小
+- `Ctrl+F` - 适应窗口
+- `Ctrl+Shift+F` - 适应宽度
+
+## 注意事项
+
+1. 对于小规模数据集，使用1度/3度/5度的旋转标注通常已经足够(可在 `libs/canvas_shortcut.py` 中修改)。
+2. 界面直接显示当前边界框的面积和角度，而不是宽度和高度，这有助于创建最小面积的标注框。
+3. 标注历史记录最多保存30步，可以通过修改 `libs/canvas.py` 中的 `MAX_HISTORY` 值来调整。
+4. 语言设置修改后需要重启程序才能生效。
+
+## 许可证
+
+本项目采用 MIT 许可证。详见 [LICENSE](LICENSE) 文件。
+
+## 致谢
+
+- [labelImg_OBB](https://github.com/heshameraqi/labelImg_OBB) - 原始项目
+- [labelImg](https://github.com/tzutalin/labelImg) - 基础框架
