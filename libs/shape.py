@@ -357,8 +357,16 @@ class Shape(object):
             sin_angle = abs(math.sin(angle_rad))
             
             # 计算在当前角度下可用的最大边长
-            max_available_width = min(max_width / cos_angle, max_height / sin_angle)
-            max_available_height = min(max_width / sin_angle, max_height / cos_angle)
+            # 添加对除零的检查
+            if sin_angle == 0:  # 角度为0或180度
+                max_available_width = max_width / cos_angle
+                max_available_height = float('inf')  # 无限制
+            elif cos_angle == 0:  # 角度为90度
+                max_available_width = float('inf')  # 无限制
+                max_available_height = max_height / sin_angle
+            else:
+                max_available_width = min(max_width / cos_angle, max_height / sin_angle)
+                max_available_height = min(max_width / sin_angle, max_height / cos_angle)
             
             # 保持宽高比调整边长
             aspect_ratio = self.width / self.height
