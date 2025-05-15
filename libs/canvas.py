@@ -858,8 +858,17 @@ class Canvas(QWidget):
             'shapes': [s.copy() for s in self.shapes],
             'current': self.current.copy() if self.current else None,
             'selectedShape': self.selectedShape,
-            'selectedShapeIndex': self.shapes.index(self.selectedShape) if self.selectedShape else -1
+            'selectedShapeIndex': -1  # 默认为-1表示没有选中形状
         }
+        
+        # 检查selectedShape是否在shapes列表中
+        if self.selectedShape is not None:
+            try:
+                state['selectedShapeIndex'] = self.shapes.index(self.selectedShape)
+            except ValueError:
+                # 如果selectedShape不在shapes列表中，将其设为None
+                state['selectedShape'] = None
+                state['selectedShapeIndex'] = -1
         
         # 保存每个形状的OBB信息
         for i, shape in enumerate(state['shapes']):
