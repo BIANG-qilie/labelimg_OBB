@@ -241,7 +241,7 @@ class Shape(object):
                 self.points[j].setY(new_ys[j])
             
             # 手动更新角度信息
-            new_angle = current_angle + math.degrees(angle)
+            new_angle = current_angle - math.degrees(angle)
             # 标准化角度到 -90 到 90 之间
             while new_angle > 90:
                 new_angle -= 180
