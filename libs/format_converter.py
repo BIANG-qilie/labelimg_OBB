@@ -21,7 +21,7 @@ except ImportError:
     print("警告: dataset-format-converter 未安装，高级格式转换功能不可用")
     print("安装命令: pip install dataset-format-converter")
 
-from libs.constants import FORMAT_PASCALVOC, FORMAT_YOLO, FORMAT_YOLO_OBB
+from libs.constants import FORMAT_PASCALVOC, FORMAT_YOLO, FORMAT_YOLO_OBB, FORMAT_DOTA, FORMAT_LABELIMG_OBB
 
 
 class FormatConverter:
@@ -32,8 +32,8 @@ class FormatConverter:
         FORMAT_PASCALVOC: 'PASCAL-VOC',
         FORMAT_YOLO: 'YOLO-HBB', 
         FORMAT_YOLO_OBB: 'YOLO-OBB',
-        'DOTA': 'DOTA',
-        'LabelImg-OBB': 'LabelImg-OBB'
+        FORMAT_DOTA: 'DOTA',
+        FORMAT_LABELIMG_OBB: 'LabelImg-OBB'
     }
     
     # 逆向映射：dataset-format-converter格式 -> 内部格式
@@ -247,6 +247,8 @@ class FormatConverter:
                 FORMAT_PASCALVOC: {"name": "PASCAL VOC", "extension": ".xml", "type": "HBB"},
                 FORMAT_YOLO: {"name": "YOLO", "extension": ".txt", "type": "HBB"},
                 FORMAT_YOLO_OBB: {"name": "YOLO OBB", "extension": ".txt", "type": "OBB"},
+                FORMAT_DOTA: {"name": "DOTA", "extension": ".txt", "type": "OBB"},
+                FORMAT_LABELIMG_OBB: {"name": "LabelImg OBB", "extension": ".txt", "type": "OBB"}
             }
         
         try:
@@ -262,14 +264,12 @@ class FormatConverter:
                         format_info[format_name] = {"name": "YOLO", "extension": ".txt", "type": "HBB"}
                     elif format_name == FORMAT_YOLO_OBB:
                         format_info[format_name] = {"name": "YOLO OBB", "extension": ".txt", "type": "OBB"}
-                else:
-                    # 外部格式
-                    if format_name == 'DOTA':
+                    elif format_name == FORMAT_DOTA:
                         format_info[format_name] = {"name": "DOTA", "extension": ".txt", "type": "OBB"}
-                    elif format_name == 'LabelImg-OBB':
+                    elif format_name == FORMAT_LABELIMG_OBB:
                         format_info[format_name] = {"name": "LabelImg OBB", "extension": ".txt", "type": "OBB"}
-                    else:
-                        format_info[format_name] = {"name": format_name, "extension": ".txt", "type": "Unknown"}
+                else:
+                    format_info[format_name] = {"name": format_name, "extension": ".txt", "type": "Unknown"}
             
             return format_info
             

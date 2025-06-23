@@ -920,30 +920,26 @@ class MainWindow(QMainWindow, WindowMixin):
             if self.usingPascalVocFormat is True:
                 if annotationFilePath[-4:].lower() != ".xml":
                     annotationFilePath += XML_EXT
-                self.labelFile.savePascalVocFormat(annotationFilePath, shapes, self.filePath, self.imageData,
-                                                   self.lineColor.getRgb(), self.fillColor.getRgb())
+                self._save_with_converter(annotationFilePath, shapes, "PASCAL-VOC")
             elif self.usingYoloFormat is True:
                 if annotationFilePath[-4:].lower() != ".txt":
                     annotationFilePath += TXT_EXT
-                self.labelFile.saveYoloFormat(annotationFilePath, shapes, self.filePath, self.imageData, self.labelHist,
-                                                   self.lineColor.getRgb(), self.fillColor.getRgb())
+                self._save_with_converter(annotationFilePath, shapes, "YOLO-HBB")
             elif self.usingYoloOBBFormat is True:
                 shapes = [format_obb_shape(shape) for shape in self.canvas.shapes]
                 if annotationFilePath[-4:].lower() != ".txt":
                     annotationFilePath += TXT_EXT
-                self.labelFile.saveYoloOBBFormat(annotationFilePath, shapes, self.filePath, self.imageData, self.labelHist,
-                                                   self.lineColor.getRgb(), self.fillColor.getRgb())
+                # 使用dataset_format_converter保存真正的YOLO-OBB格式
+                self._save_with_converter(annotationFilePath, shapes, FORMAT_YOLO_OBB)
             elif self.usingLabelImgOBBFormat is True:
                 shapes = [format_obb_shape(shape) for shape in self.canvas.shapes]
                 if annotationFilePath[-4:].lower() != ".txt":
                     annotationFilePath += TXT_EXT
-                self.labelFile.saveYoloOBBFormat(annotationFilePath, shapes, self.filePath, self.imageData, self.labelHist,
-                                                   self.lineColor.getRgb(), self.fillColor.getRgb())
+                self._save_with_converter(annotationFilePath, shapes, "LabelImg-OBB")
             elif self.usingDOTAFormat is True:
                 shapes = [format_obb_shape(shape) for shape in self.canvas.shapes]
                 if annotationFilePath[-4:].lower() != ".txt":
                     annotationFilePath += TXT_EXT
-                # 使用dataset_format_converter保存DOTA格式
                 self._save_with_converter(annotationFilePath, shapes, FORMAT_DOTA)
             else:
                 self.labelFile.save(annotationFilePath, shapes, self.filePath, self.imageData,
@@ -1332,8 +1328,8 @@ class MainWindow(QMainWindow, WindowMixin):
                                                      '%s - Open Directory' % __appname__, defaultOpenDirPath,
                                                      QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks))
         
-        # 查找classes.txt
         if targetDirPath:
+            # 查找classes.txt
             classes_file = os.path.join(targetDirPath, 'classes.txt')
             print(f"正在查找classes.txt: {classes_file}")
             if os.path.exists(classes_file):
@@ -1563,15 +1559,18 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def loadPredefinedClasses(self, predefClassesFile):
         if os.path.exists(predefClassesFile) is True:
-            self.labelHist = []
+            labelHist = []
             with codecs.open(predefClassesFile, 'r', 'utf8') as f:
                 for line in f:
                     line = line.strip()
-                    self.labelHist.append(line)
-            # 更新LabelDialog
-            if hasattr(self, 'labelDialog'):
-                self.labelDialog = LabelDialog(parent=self, listItem=self.labelHist)
-            print(f"已加载类别: {self.labelHist}")  # 添加调试信息
+                    labelHist.append(line)
+            self.loadPredefinedClassesList(labelHist)            
+
+    def loadPredefinedClassesList(self, predefClasses: list[str]):
+        self.labelHist = predefClasses
+        if hasattr(self, 'labelDialog'):
+            self.labelDialog = LabelDialog(parent=self, listItem=self.labelHist)
+        print(f"已加载类别: {self.labelHist}")  # 添加调试信息
 
     def loadPascalXMLByFilename(self, xmlPath):
         """使用UniversalReader加载Pascal VOC格式"""
