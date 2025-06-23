@@ -398,8 +398,14 @@ class Shape(object):
         self.addPoint(QPointF(p[4], p[5]))
         self.addPoint(QPointF(p[6], p[7]))
         
-        # 更新OBB信息
+        # 保存原始角度，避免被updateOBBInfo覆盖
+        original_angle = self.angle
+        
+        # 更新OBB信息（但不更新角度）
         self.updateOBBInfo()
+        
+        # 恢复原始角度
+        self.angle = original_angle
         return True
         
     def highlightVertex(self, i, action):

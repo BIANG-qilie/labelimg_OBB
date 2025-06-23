@@ -7,6 +7,7 @@ import platform
 import re
 import sys
 import subprocess
+import tempfile
 
 from functools import partial
 from collections import defaultdict
@@ -39,14 +40,12 @@ from libs.labelDialog import LabelDialog
 from libs.colorDialog import ColorDialog
 from libs.labelFile import LabelFile, LabelFileError
 from libs.toolBar import ToolBar
-from libs.pascal_voc_io import PascalVocReader
-from libs.pascal_voc_io import XML_EXT
-from libs.yolo_io import YoloReader
-from libs.yolo_obb_io import YoloOBBReader
-from libs.yolo_io import TXT_EXT
+from libs.constants import XML_EXT, TXT_EXT
 from libs.ustr import ustr
 from libs.version import __version__
 from libs.hashableQListWidgetItem import HashableQListWidgetItem
+from libs.format_converter import format_converter
+from libs.universal_reader import UniversalReader
 
 __appname__ = 'labelImg'
 
@@ -101,7 +100,9 @@ class MainWindow(QMainWindow, WindowMixin):
         self.defaultSaveDir = defaultSaveDir
         self.usingPascalVocFormat = False
         self.usingYoloFormat = False
-        self.usingYoloOBBFormat = True # Default Format
+        self.usingYoloOBBFormat = False
+        self.usingLabelImgOBBFormat = True # Default Format (当前的YOLO_OBB实际是LabelImg-OBB)
+        self.usingDOTAFormat = False
 
         # For loading all image under a directory
         self.mImgList = []
@@ -517,36 +518,54 @@ class MainWindow(QMainWindow, WindowMixin):
 
     ## Support Functions ##
     def set_format(self, save_format):
-        '''
+        # 重置所有格式标志
+        self.usingPascalVocFormat = False
+        self.usingYoloFormat = False
+        self.usingYoloOBBFormat = False
+        self.usingLabelImgOBBFormat = False
+        self.usingDOTAFormat = False
+        
         if save_format == FORMAT_PASCALVOC:
             self.actions.save_format.setText(FORMAT_PASCALVOC)
             self.actions.save_format.setIcon(newIcon("format_voc"))
-            self.usingPascalVocFormat = False
-            self.usingYoloFormat = False
-            self.usingYoloOBBFormat = True
+            self.usingPascalVocFormat = True
             LabelFile.suffix = XML_EXT
 
         elif save_format == FORMAT_YOLO:
             self.actions.save_format.setText(FORMAT_YOLO)
             self.actions.save_format.setIcon(newIcon("format_yolo"))
-            self.usingPascalVocFormat = False
-            self.usingYoloFormat = False
+            self.usingYoloFormat = True
+            LabelFile.suffix = TXT_EXT
+            
+        elif save_format == FORMAT_YOLO_OBB:
+            self.actions.save_format.setText(FORMAT_YOLO_OBB)
+            self.actions.save_format.setIcon(newIcon("format_yolo_obb"))
             self.usingYoloOBBFormat = True
             LabelFile.suffix = TXT_EXT
             
-        elif save_format == FORMAT_YOLO_OBB:'''
-        
-        self.actions.save_format.setText(FORMAT_YOLO_OBB)
-        self.actions.save_format.setIcon(newIcon("format_yolo_obb"))
-        self.usingPascalVocFormat = False
-        self.usingYoloFormat = False
-        self.usingYoloOBBFormat = True
-        LabelFile.suffix = TXT_EXT
+        elif save_format == FORMAT_LABELIMG_OBB:
+            self.actions.save_format.setText(FORMAT_LABELIMG_OBB)
+            self.actions.save_format.setIcon(newIcon("format_yolo_obb"))  # 暂时使用相同图标
+            self.usingLabelImgOBBFormat = True
+            LabelFile.suffix = TXT_EXT
+            
+        elif save_format == FORMAT_DOTA:
+            self.actions.save_format.setText(FORMAT_DOTA)
+            self.actions.save_format.setIcon(newIcon("format_dota"))
+            self.usingDOTAFormat = True
+            LabelFile.suffix = TXT_EXT
 
     def change_format(self):
-        if self.usingPascalVocFormat: self.set_format(FORMAT_YOLO)
-        elif self.usingYoloFormat: self.set_format(FORMAT_YOLO_OBB)
-        elif self.usingYoloOBBFormat: self.set_format(FORMAT_PASCALVOC)
+        if self.usingPascalVocFormat: 
+            self.set_format(FORMAT_YOLO)
+        elif self.usingYoloFormat: 
+            self.set_format(FORMAT_YOLO_OBB)
+        elif self.usingYoloOBBFormat: 
+            self.set_format(FORMAT_LABELIMG_OBB)
+        elif self.usingLabelImgOBBFormat: 
+            self.set_format(FORMAT_DOTA)
+        elif self.usingDOTAFormat: 
+            self.set_format(FORMAT_PASCALVOC)
 
     def noShapes(self):
         return not self.itemsToShapes
@@ -914,6 +933,18 @@ class MainWindow(QMainWindow, WindowMixin):
                     annotationFilePath += TXT_EXT
                 self.labelFile.saveYoloOBBFormat(annotationFilePath, shapes, self.filePath, self.imageData, self.labelHist,
                                                    self.lineColor.getRgb(), self.fillColor.getRgb())
+            elif self.usingLabelImgOBBFormat is True:
+                shapes = [format_obb_shape(shape) for shape in self.canvas.shapes]
+                if annotationFilePath[-4:].lower() != ".txt":
+                    annotationFilePath += TXT_EXT
+                self.labelFile.saveYoloOBBFormat(annotationFilePath, shapes, self.filePath, self.imageData, self.labelHist,
+                                                   self.lineColor.getRgb(), self.fillColor.getRgb())
+            elif self.usingDOTAFormat is True:
+                shapes = [format_obb_shape(shape) for shape in self.canvas.shapes]
+                if annotationFilePath[-4:].lower() != ".txt":
+                    annotationFilePath += TXT_EXT
+                # 使用dataset_format_converter保存DOTA格式
+                self._save_with_converter(annotationFilePath, shapes, FORMAT_DOTA)
             else:
                 self.labelFile.save(annotationFilePath, shapes, self.filePath, self.imageData,
                                     self.lineColor.getRgb(), self.fillColor.getRgb())
@@ -1147,30 +1178,18 @@ class MainWindow(QMainWindow, WindowMixin):
                 xmlPath = os.path.join(self.defaultSaveDir, basename + XML_EXT)
                 txtPath = os.path.join(self.defaultSaveDir, basename + TXT_EXT)
 
-                """Annotation file priority:
-                PascalXML > YOLO_OBB > YOLO
-                """
+                """智能格式检测和加载"""
                 if os.path.isfile(xmlPath):
                     self.loadPascalXMLByFilename(xmlPath)
                 elif os.path.isfile(txtPath):
-                    with open(txtPath) as f:
-                        first_line = f.readline()
-                        if (first_line == "YOLO_OBB\n"):
-                            self.loadYOLOTOBBXTByFilename(txtPath)
-                        else:
-                            self.loadYOLOTXTByFilename(txtPath)
+                    self.loadAnnotationWithSmartDetection(txtPath)
             else:
                 xmlPath = os.path.splitext(filePath)[0] + XML_EXT
                 txtPath = os.path.splitext(filePath)[0] + TXT_EXT
                 if os.path.isfile(xmlPath):
                     self.loadPascalXMLByFilename(xmlPath)
                 elif os.path.isfile(txtPath):
-                    with open(txtPath) as f:
-                        first_line = f.readline()
-                        if (first_line == "YOLO_OBB\n"):
-                            self.loadYOLOTOBBXTByFilename(txtPath)
-                        else:
-                            self.loadYOLOTXTByFilename(txtPath)
+                    self.loadAnnotationWithSmartDetection(txtPath)
 
             self.setWindowTitle(__appname__ + ' ' + filePath)
 
@@ -1555,42 +1574,172 @@ class MainWindow(QMainWindow, WindowMixin):
             print(f"已加载类别: {self.labelHist}")  # 添加调试信息
 
     def loadPascalXMLByFilename(self, xmlPath):
+        """使用UniversalReader加载Pascal VOC格式"""
         if self.filePath is None:
             return
         if os.path.isfile(xmlPath) is False:
             return
 
         self.set_format(FORMAT_PASCALVOC)
-
-        tVocParseReader = PascalVocReader(xmlPath)
-        shapes = tVocParseReader.getShapes()
-        self.loadLabels(shapes)
-        self.canvas.verified = tVocParseReader.verified
+        self._load_with_universal_reader(xmlPath, FORMAT_PASCALVOC)
 
     def loadYOLOTXTByFilename(self, txtPath):
+        """使用UniversalReader加载YOLO格式"""
         if self.filePath is None:
             return
         if os.path.isfile(txtPath) is False:
             return
 
         self.set_format(FORMAT_YOLO)
-        tYoloParseReader = YoloReader(txtPath, self.image)
-        shapes = tYoloParseReader.getShapes()
-        print (shapes)
-        self.loadLabels(shapes)
+        self._load_with_universal_reader(txtPath, FORMAT_YOLO)
         
     def loadYOLOTOBBXTByFilename(self, txtPath):
+        """使用UniversalReader加载YOLO OBB格式"""
         if self.filePath is None:
             return
         if os.path.isfile(txtPath) is False:
             return
 
         self.set_format(FORMAT_YOLO_OBB)
-        tYoloOBBParseReader = YoloOBBReader(txtPath, self.image)
-        shapes = tYoloOBBParseReader.getShapes()
-        print (shapes)
-        self.loadOBBLabels(shapes)
-        self.canvas.verified = tYoloOBBParseReader.verified
+        self._load_with_universal_reader(txtPath, FORMAT_YOLO_OBB)
+    
+    def _load_with_universal_reader(self, file_path, expected_format):
+        """使用UniversalReader加载文件的通用方法"""
+        try:
+            # 获取图像尺寸
+            image_size = (self.image.width(), self.image.height())
+            
+            # 创建统一读取器
+            reader = UniversalReader(
+                file_path=file_path,
+                image_size=image_size,
+                class_names=self.labelHist
+            )
+            
+            # 获取形状数据
+            shapes = reader.get_shapes()
+            
+            # 加载形状数据
+            if shapes:
+                if expected_format in [FORMAT_YOLO_OBB, FORMAT_LABELIMG_OBB, FORMAT_DOTA]:
+                    self.loadOBBLabels(shapes)
+                else:
+                    self.loadLabels(shapes)
+                self.canvas.verified = reader.verified
+                
+        except Exception as e:
+            print(f"使用UniversalReader加载失败: {e}")
+            # 如果失败，至少设置格式
+            pass
+
+    def loadAnnotationWithSmartDetection(self, annotation_path):
+        """使用智能格式检测和统一读取器加载标注文件"""
+        if self.filePath is None:
+            return
+        if not os.path.isfile(annotation_path):
+            return
+        
+        try:
+            # 获取图像尺寸
+            image_size = (self.image.width(), self.image.height())
+            
+            # 创建统一读取器
+            reader = UniversalReader(
+                file_path=annotation_path,
+                image_size=image_size,
+                class_names=self.labelHist
+            )
+            
+            # 获取形状数据
+            shapes = reader.get_shapes()
+            
+            # 根据检测到的格式设置当前格式
+            detected_format = format_converter.detect_format(annotation_path)
+            if detected_format:
+                if detected_format == FORMAT_PASCALVOC:
+                    self.set_format(FORMAT_PASCALVOC)
+                elif detected_format == FORMAT_YOLO:
+                    self.set_format(FORMAT_YOLO)
+                elif detected_format == FORMAT_YOLO_OBB:
+                    self.set_format(FORMAT_YOLO_OBB)
+                elif detected_format == FORMAT_LABELIMG_OBB:
+                    self.set_format(FORMAT_LABELIMG_OBB)
+                elif detected_format == FORMAT_DOTA:
+                    self.set_format(FORMAT_DOTA)
+            
+            # 加载形状数据
+            if shapes:
+                self.loadOBBLabels(shapes)
+                self.canvas.verified = reader.verified
+            
+        except Exception as e:
+            print(f"使用统一读取器加载失败: {e}")
+            # 回退到传统方法
+            self._fallback_load_annotation(annotation_path)
+    
+    def _fallback_load_annotation(self, annotation_path):
+        """回退的标注加载方法，使用UniversalReader"""
+        try:
+            # 直接使用UniversalReader，它有自己的格式检测逻辑
+            image_size = (self.image.width(), self.image.height())
+            
+            reader = UniversalReader(
+                file_path=annotation_path,
+                image_size=image_size,
+                class_names=self.labelHist
+            )
+            
+            shapes = reader.get_shapes()
+            
+            if shapes:
+                # 根据文件扩展名设置格式
+                file_ext = os.path.splitext(annotation_path)[1].lower()
+                if file_ext == '.xml':
+                    self.set_format(FORMAT_PASCALVOC)
+                    self.loadLabels(shapes)
+                else:
+                    # 默认使用LabelImg-OBB格式
+                    self.set_format(FORMAT_LABELIMG_OBB)
+                    self.loadOBBLabels(shapes)
+                
+                self.canvas.verified = reader.verified
+                
+        except Exception as e:
+            print(f"回退加载方法也失败: {e}")
+    
+    def _save_with_converter(self, annotation_path, shapes, target_format):
+        """使用dataset_format_converter保存标注"""
+        try:
+            # 首先保存为LabelImg-OBB格式的临时文件
+            temp_fd, temp_file = tempfile.mkstemp(suffix='.txt')
+            os.close(temp_fd)
+            
+            # 使用现有的保存方法保存为LabelImg-OBB格式
+            self.labelFile.saveYoloOBBFormat(temp_file, shapes, self.filePath, self.imageData, self.labelHist,
+                                           self.lineColor.getRgb(), self.fillColor.getRgb())
+            
+            # 使用format_converter转换为目标格式
+            success = format_converter.convert_file(
+                input_file=temp_file,
+                output_file=annotation_path,
+                input_format=FORMAT_LABELIMG_OBB,
+                output_format=target_format,
+                image_width=self.image.width(),
+                image_height=self.image.height(),
+                class_names=self.labelHist
+            )
+            
+            # 清理临时文件
+            os.unlink(temp_file)
+            
+            if not success:
+                raise Exception("格式转换失败")
+                
+        except Exception as e:
+            print(f"使用converter保存失败: {e}")
+            # 回退到默认保存方法
+            self.labelFile.saveYoloOBBFormat(annotation_path, shapes, self.filePath, self.imageData, self.labelHist,
+                                           self.lineColor.getRgb(), self.fillColor.getRgb())
 
     def togglePaintLabelsOption(self):
         for shape in self.canvas.shapes:

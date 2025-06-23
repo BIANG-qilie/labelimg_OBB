@@ -10,6 +10,9 @@
 - 实时显示边界框面积和角度
 - 支持标注历史记录(最多100步)
 - 支持YOLO OBB格式导出
+- **🆕 集成多格式转换器** - 支持DOTA、LabelImg-OBB等多种格式互转
+- **🆕 批量格式转换** - 支持整个目录的批量格式转换
+- **🆕 智能格式检测** - 自动识别标注文件格式
 
 ## 安装说明
 
@@ -24,9 +27,19 @@ conda env create -f requirement/labelimgOBB.yml
 conda activate labelimgOBB
 ```
 
-3. 启动程序:
+3. 安装格式转换依赖 (可选):
+```bash
+pip install dataset-format-converter
+```
+
+4. 启动程序:
 ```bash
 python labelImg.py
+```
+
+5. 测试格式转换功能:
+```bash
+python test_format_converter.py
 ```
 
 ## 快捷键说明
@@ -57,12 +70,57 @@ python labelImg.py
 - `Ctrl+F` - 适应窗口
 - `Ctrl+Shift+F` - 适应宽度
 
+## 格式转换功能
+
+### 支持的格式
+
+| 格式 | 类型 | 描述 |
+|------|------|------|
+| YOLO-HBB | 水平框 | 标准YOLO格式 |
+| YOLO-OBB | 旋转框 | YOLO旋转边界框格式 |
+| PASCAL VOC | 水平框 | XML格式 |
+| DOTA | 旋转框 | 多边形旋转框格式 |
+| LabelImg-OBB | 旋转框 | 带角度的旋转框格式 |
+
+### 使用方法
+
+1. **图形界面转换**：
+   - 在主菜单中选择"工具" → "格式转换器"
+   - 选择输入/输出路径和格式
+   - 支持单文件和批量转换
+
+2. **API调用**：
+```python
+from libs.format_converter import format_converter
+
+# 单文件转换
+success = format_converter.convert_file(
+    input_file='input.txt',
+    output_file='output.txt',
+    input_format='YOLO_OBB',
+    output_format='DOTA',
+    image_width=1920,
+    image_height=1080
+)
+
+# 批量转换
+success_count, total_count = format_converter.convert_directory(
+    input_dir='./labels',
+    output_dir='./converted',
+    input_format='YOLO_OBB',
+    output_format='DOTA',
+    image_width=1920,
+    image_height=1080
+)
+```
+
 ## 注意事项
 
 1. 对于小规模数据集，使用1度/3度/5度的旋转标注通常已经足够(可在 `libs/canvas_shortcut.py` 中修改)。
 2. 界面直接显示当前边界框的面积和角度，而不是宽度和高度，这有助于创建最小面积的标注框。
 3. 标注历史记录最多保存30步，可以通过修改 `libs/canvas.py` 中的 `MAX_HISTORY` 值来调整。
 4. 语言设置修改后需要重启程序才能生效。
+5. **格式转换功能需要安装 `dataset-format-converter` 库才能使用。**
 
 ## 许可证
 
