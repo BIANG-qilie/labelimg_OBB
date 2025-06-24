@@ -2,6 +2,45 @@
 History
 =======
 
+1.8.2.3 (2025-01-XX)
+--------------------
+
+English：
+* Add Dataset-Format-Converter support for direct export to various data formats
+* Fix various bugs
+
+Chinese：
+* 加入Dataset-Format-Converter的格式支持，支持直接导出各种格式的数据
+* 修复了一些bug
+
+1.8.2.2 (2025-01-XX)
+--------------------
+
+English：
+* Fix: Prevent selectedShape reference errors when switching file lists that cause program crashes
+* Fix: Division by zero error in updatePointsFromOBBInfo method, handle cases where sin_angle or cos_angle is 0 when angle is 0° or 90°
+* Fix: Shortcut key rotation bugs
+
+Chinese：
+* 修复：在文件列表切换时防止selectedShape引用错误导致的程序崩溃
+* 修复：updatePointsFromOBBInfo方法中的除零错误，处理角度为0度或90度时sin_angle或cos_angle为0的情况
+* 修复：快捷键旋转bug
+
+1.8.2.1 (2025-01-XX)
+--------------------
+
+English：
+* Fix issue where out-of-bounds annotation boxes would be lost after reloading
+* Auto-resize annotation boxes to maximum appropriate size
+* Implement undo functionality
+* Support multi-language versions
+* Better suited for Chinese users
+
+Chinese：
+* 解决了超限的标注框重新加载后会丢失的问题，会自动缩小到最大合适的标注框
+* 实现了回撤功能
+* 支持多语言版本，更适合中国宝宝体质
+
 1.8.2 (2025-05-02)
 ------------------
 English：
