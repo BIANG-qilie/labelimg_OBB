@@ -207,11 +207,11 @@ class UniversalReader:
                             label = f"class_{class_index}"
                         
                         # 添加到形状列表
-                        # 格式: (label, cx, cy, w, h, angle, None, None, False)
+                        # 格式: (label, cx, cy, h, w, angle, None, None, False) - 保持与文件中w h的顺序一致
                         shape = (label, cx, cy, w, h, angle, None, None, False)
                         self.shapes.append(shape)
                         
-                        print(f"已加载标注: {label} - 中心点({cx}, {cy}), 尺寸({h}x{w}), 角度{angle}度")
+                        print(f"已加载标注: {label} - 中心点({cx}, {cy}), 尺寸({w}x{h}), 角度{angle}度")
                         
                 except ValueError as e:
                     print(f"解析行失败: {line}, 错误: {e}")

@@ -11,6 +11,7 @@ import tempfile
 
 from functools import partial
 from collections import defaultdict
+from typing import List
 
 try:
     from PyQt5.QtGui import *
@@ -115,8 +116,6 @@ class MainWindow(QMainWindow, WindowMixin):
 
         self._noSelectionSlot = False
         self._beginner = True
-        self.screencastViewer = self.getAvailableScreencastViewer()
-        self.screencast = "https://youtu.be/p0nR2YsCY_U"
 
         # Load predefined classes to the list
         self.loadPredefinedClasses(defaultPrefdefClassFile)
@@ -284,7 +283,6 @@ class MainWindow(QMainWindow, WindowMixin):
                          enabled=False)
 
         showQuickInstr = action(getStr('quickinstr'), self.showQuickInstrDialog, None, 'help', getStr('quickinstr'))
-        help = action(getStr('tutorial'), self.showTutorialDialog, None, 'help', getStr('tutorialDetail'))
         showInfo = action(getStr('info'), self.showInfoDialog, None, 'help', getStr('info'))
         showShortcuts = action(getStr('shortcuts'), self.showShortcutsDialog, None, 'help', getStr('shortcutsDetail'))
 
@@ -400,7 +398,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
         addActions(self.menus.file,
                    (open, opendir, changeSavedir, openAnnotation, self.menus.recentFiles, save, save_format, saveAs, close, None, preferences, None, resetAll, quit))
-        addActions(self.menus.help, (showQuickInstr, help, showInfo, showShortcuts))
+        addActions(self.menus.help, (showQuickInstr, showInfo, showShortcuts))
         addActions(self.menus.view, (
             self.autoSaving,
             self.singleClassMode,
@@ -654,25 +652,12 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def advanced(self):
         return not self.beginner()
-
-    def getAvailableScreencastViewer(self):
-        osName = platform.system()
-
-        if osName == 'Windows':
-            return ['C:\\Program Files\\Internet Explorer\\iexplore.exe']
-        elif osName == 'Linux':
-            return ['xdg-open']
-        elif osName == 'Darwin':
-            return ['open', '-a', 'Safari']
-
+    
     ## Callbacks ##
     def showQuickInstrDialog(self):
         msg = "Left Click & Drag to create object. Left Click to move it. Left Click points to resize it. Right Click points to rotate it."
         QMessageBox.information(self, self.stringBundle.getString('quickInstructionsTitle'), msg)
         
-    def showTutorialDialog(self):
-        subprocess.Popen(self.screencastViewer + [self.screencast])
-
     def showInfoDialog(self):
         msg = u'Name:{0} \nApp Version:{1} \n{2} '.format(__appname__, __version__, sys.version_info)
         QMessageBox.information(self, self.stringBundle.getString('informationTitle'), msg)
@@ -816,10 +801,36 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def loadLabels(self, shapes):
         s = []
-        for label, points, line_color, fill_color, difficult in shapes:
-            shape = Shape(label=label)
+        for shape_data in shapes:
+            # 检测数据格式并处理
+            if len(shape_data) == 9 and isinstance(shape_data[1], (int, float)):
+                # UniversalReader格式: (label, cx, cy, w, h, angle, line_color, fill_color, difficult)
+                label, cx, cy, w, h, angle, line_color, fill_color, difficult = shape_data
+                
+                # 如果角度为0（或接近0），转换为矩形points
+                if abs(angle) < 0.1:  # 角度接近0，当作矩形处理
+                    # 从中心点和尺寸计算矩形的四个角点
+                    x_min = cx - w / 2
+                    y_min = cy - h / 2
+                    x_max = cx + w / 2
+                    y_max = cy + h / 2
+                    
+                    points = [
+                        (x_min, y_min),  # 左上角
+                        (x_max, y_min),  # 右上角
+                        (x_max, y_max),  # 右下角
+                        (x_min, y_max)   # 左下角
+                    ]
+                else:
+                    # 有旋转角度，使用loadOBBLabels处理
+                    self.loadOBBLabels([shape_data])
+                    continue
+            else:
+                # 传统格式: (label, points, line_color, fill_color, difficult)
+                label, points, line_color, fill_color, difficult = shape_data
+            
+            shape = Shape(label=label, rotation_enabled=False)  # 禁用旋转
             for x, y in points:
-
                 # Ensure the labels are within the bounds of the image. If not, fix them.
                 if x < 0 or x > self.canvas.pixmap.width() or y < 0 or y > self.canvas.pixmap.height():
                     x = max(x, 0)
@@ -849,7 +860,7 @@ class MainWindow(QMainWindow, WindowMixin):
         
     def loadOBBLabels(self, shapes):
         s = []
-        for label, centre_x, centre_y, height, width, angle, line_color, fill_color, difficult in shapes:
+        for label, centre_x, centre_y, width, height, angle, line_color, fill_color, difficult in shapes:
             shape = Shape(label=label)
 
             # 检查中心点是否在图像边界内
@@ -1566,7 +1577,7 @@ class MainWindow(QMainWindow, WindowMixin):
                     labelHist.append(line)
             self.loadPredefinedClassesList(labelHist)            
 
-    def loadPredefinedClassesList(self, predefClasses: list[str]):
+    def loadPredefinedClassesList(self, predefClasses: List[str]):
         self.labelHist = predefClasses
         if hasattr(self, 'labelDialog'):
             self.labelDialog = LabelDialog(parent=self, listItem=self.labelHist)
@@ -1621,8 +1632,10 @@ class MainWindow(QMainWindow, WindowMixin):
             # 加载形状数据
             if shapes:
                 if expected_format in [FORMAT_YOLO_OBB, FORMAT_LABELIMG_OBB, FORMAT_DOTA]:
+                    # OBB格式使用loadOBBLabels
                     self.loadOBBLabels(shapes)
                 else:
+                    # 矩形格式使用loadLabels（已兼容UniversalReader格式）
                     self.loadLabels(shapes)
                 self.canvas.verified = reader.verified
                 
@@ -1695,10 +1708,12 @@ class MainWindow(QMainWindow, WindowMixin):
                 file_ext = os.path.splitext(annotation_path)[1].lower()
                 if file_ext == '.xml':
                     self.set_format(FORMAT_PASCALVOC)
+                    # Pascal VOC是矩形格式，使用loadLabels
                     self.loadLabels(shapes)
                 else:
                     # 默认使用LabelImg-OBB格式
                     self.set_format(FORMAT_LABELIMG_OBB)
+                    # OBB格式使用loadOBBLabels
                     self.loadOBBLabels(shapes)
                 
                 self.canvas.verified = reader.verified

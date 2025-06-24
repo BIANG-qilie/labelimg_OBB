@@ -178,6 +178,9 @@ class Canvas(QWidget):
         # ev.buttons is mouse buttons mask (https://doc.qt.io/qt-5/qt.html#MouseButton-enum)
         elif Qt.RightButton & ev.buttons():
             if self.selectedVertex():
+                # 检查是否允许旋转
+                if hasattr(self.hShape, 'rotation_enabled') and not self.hShape.rotation_enabled:
+                    return  # 禁止旋转
                 self.overrideCursor(CURSOR_CROSS)
                 print("canvas line 168", pos)
                 self.rotateVertex(pos)
@@ -212,7 +215,11 @@ class Canvas(QWidget):
                 self.hVertex, self.hShape = index, shape
                 shape.highlightVertex(index, shape.MOVE_VERTEX)
                 self.overrideCursor(CURSOR_POINT)
-                self.setToolTip("Left Click & Drag point to move. Right Click & Drag points to rotate.")
+                # 根据是否允许旋转显示不同的提示
+                if hasattr(shape, 'rotation_enabled') and not shape.rotation_enabled:
+                    self.setToolTip("Left Click & Drag point to move.")
+                else:
+                    self.setToolTip("Left Click & Drag point to move. Right Click & Drag points to rotate.")
                 self.setStatusTip(self.toolTip())
                 self.update()
                 break
@@ -220,8 +227,11 @@ class Canvas(QWidget):
                 if self.selectedVertex():
                     self.hShape.highlightClear()
                 self.hVertex, self.hShape = None, shape
-                self.setToolTip(
-                    "Click & Drag to move shape '%s'. Right Click points to rotate." % shape.label)
+                # 根据是否允许旋转显示不同的提示
+                if hasattr(shape, 'rotation_enabled') and not shape.rotation_enabled:
+                    self.setToolTip("Click & Drag to move shape '%s'." % shape.label)
+                else:
+                    self.setToolTip("Click & Drag to move shape '%s'. Right Click points to rotate." % shape.label)
                 self.setStatusTip(self.toolTip())
                 self.overrideCursor(CURSOR_GRAB)
                 self.update()
@@ -427,7 +437,15 @@ class Canvas(QWidget):
             self.saveState()
 
     #  rotate by angle, added
+    def _canRotate(self):
+        """检查当前选中的形状是否允许旋转"""
+        if not self.selectedShape:
+            return False
+        return not (hasattr(self.selectedShape, 'rotation_enabled') and not self.selectedShape.rotation_enabled)
+
     def rotateShape(self, angle):
+        if not self._canRotate():
+            return  # 禁止旋转
         self.selectedShape.rotateBy(angle, self.pixmap.width(), self.pixmap.height())  # Clock-wise
         self.shapeMoved.emit()
         self.repaint()
@@ -690,18 +708,18 @@ class Canvas(QWidget):
             self.moveOnePixel('Up')
         elif key == Qt.Key_Down and self.selectedShape:
             self.moveOnePixel('Down')
-        # rotation
-        elif key == Qt.Key_O and self.selectedShape:  # O
+        # rotation - 检查是否允许旋转
+        elif key == Qt.Key_O and self.selectedShape and self._canRotate():  # O
             self.rotateShape(-math.pi/1800)  # -0.1 degree
-        elif key == Qt.Key_P and self.selectedShape:  # P
+        elif key == Qt.Key_P and self.selectedShape and self._canRotate():  # P
             self.rotateShape(math.pi/1800)  # 0.1 degree
-        elif key == Qt.Key_K and self.selectedShape:  # K
+        elif key == Qt.Key_K and self.selectedShape and self._canRotate():  # K
             self.rotateShape(-math.pi/180)  # -1 degree
-        elif key == Qt.Key_L and self.selectedShape:  # L
+        elif key == Qt.Key_L and self.selectedShape and self._canRotate():  # L
             self.rotateShape(math.pi/180)  # -1 degree
-        elif key == Qt.Key_M and self.selectedShape:   # M
+        elif key == Qt.Key_M and self.selectedShape and self._canRotate():   # M
             self.rotateShape(-math.pi/36)  # -5 degree
-        elif key == Qt.Key_Comma and self.selectedShape:    # 逗号,
+        elif key == Qt.Key_Comma and self.selectedShape and self._canRotate():    # 逗号,
             self.rotateShape(math.pi/36)  # 5 degree
         # 添加Ctrl+Z撤销功能
         elif ev.modifiers() & Qt.ControlModifier and key == Qt.Key_Z:
@@ -800,9 +818,7 @@ class Canvas(QWidget):
     def loadShapes(self, shapes):
         self.shapes = list(shapes)
         self.current = None
-        # 不再自动更新OBB信息，避免覆盖角度
-        #for s in shapes:
-        #    s.updateOBBInfo()
+        # 不调用updateOBBInfo，保持形状的原始属性
         self.repaint()
         # 加载形状后保存初始状态
         self.history = []
@@ -870,9 +886,8 @@ class Canvas(QWidget):
                 state['selectedShape'] = None
                 state['selectedShapeIndex'] = -1
         
-        # 保存每个形状的OBB信息
-        for i, shape in enumerate(state['shapes']):
-            shape.updateOBBInfo()  # 确保OBB信息（角度、宽高等）被更新
+        # 不调用updateOBBInfo，保持形状的原始OBB信息
+        # 这样可以避免在保存时意外改变形状的属性
         
         # 判断状态是否发生变化
         if self.currentState is not None:
@@ -972,19 +987,18 @@ class Canvas(QWidget):
         # 从状态恢复形状
         self.shapes = []
         for s in state['shapes']:
-            # 完全复制形状，但不要重新计算OBB信息
+            # 完全复制形状，保持所有原始信息
             new_shape = s.copy()
-            # 确保角度信息被正确保存
+            # 确保所有信息被正确复制，不重新计算
             new_shape.angle = s.angle
             new_shape.width = s.width
             new_shape.height = s.height
             new_shape.origin = [o for o in s.origin]
+            new_shape.points = [QPointF(p.x(), p.y()) for p in s.points]  # 直接复制原始点位置
+            new_shape.rotation_enabled = getattr(s, 'rotation_enabled', True)  # 复制旋转设置
             
-            # 强制使用OBB信息重新计算点的位置
-            # 这样可以确保视觉显示的角度与保存的角度一致
-            if self.pixmap:
-                new_shape.updatePointsFromOBBInfo(self.pixmap.width(), self.pixmap.height())
-                
+            # 不调用updatePointsFromOBBInfo，直接使用保存的点位置
+            # 这样可以避免意外的形状变化
             self.shapes.append(new_shape)
         
         # 尝试恢复标签

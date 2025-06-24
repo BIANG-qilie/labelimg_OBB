@@ -46,7 +46,7 @@ class Shape(object):
     point_size = 8
     scale = 1.0
 
-    def __init__(self, label=None, line_color=None, difficult=False, paintLabel=False):
+    def __init__(self, label=None, line_color=None, difficult=False, paintLabel=False, rotation_enabled=True):
         self.label = label
         self.points = []
         self.origin = [0, 0]
@@ -57,6 +57,7 @@ class Shape(object):
         self.selected = False
         self.difficult = difficult
         self.paintLabel = paintLabel
+        self.rotation_enabled = rotation_enabled  # 控制是否允许旋转
 
         self._highlightIndex = None
         self._highlightMode = self.NEAR_VERTEX
@@ -145,8 +146,17 @@ class Shape(object):
                     self.label = ""
                 if min_y < MIN_Y_LABEL:
                     min_y += MIN_Y_LABEL
-                painter.drawText(min_x, min_y,
-                                 "s={0:.1f} , \u03F4={1:.1f}".format(self.width * self.height, self.angle))
+                
+                # 计算实际面积
+                area = self._calculateArea()
+                
+                # 根据是否允许旋转决定显示内容
+                if hasattr(self, 'rotation_enabled') and not self.rotation_enabled:
+                    # HBB：只显示面积，不显示角度
+                    painter.drawText(min_x, min_y, "s={0:.1f}".format(area))
+                else:
+                    # OBB：显示面积和角度
+                    painter.drawText(min_x, min_y, "s={0:.1f} , \u03F4={1:.1f}".format(area, self.angle))
 
                 #painter.drawText(min_x, min_y, "h={0:.1f}, w={1:.1f}, s={2:.1f} , \u03F4={3:.1f}".format(self.height, self.width, self.width*self.height, self.angle))
 
@@ -256,13 +266,20 @@ class Shape(object):
             self.origin[0] = minX + (maxX-minX)/2.0
             self.origin[1] = minY + (maxY-minY)/2.0
             
-            # 计算宽高
+            # 计算宽高 - 保持原有宽高比例，不强制height > width
             val1 = math.sqrt( ((self.points[1].x()-self.points[0].x())**2) + 
                              ((self.points[1].y()-self.points[0].y())**2) )
             val2 = math.sqrt( ((self.points[2].x()-self.points[1].x())**2) + 
                              ((self.points[2].y()-self.points[1].y())**2) )
-            self.height = max([val1, val2])
-            self.width = min([val1, val2])
+            
+            # 保持原有的宽高值完全不变
+            if hasattr(self, 'width') and hasattr(self, 'height') and self.width > 0 and self.height > 0:
+                # 完全保持原有的width和height值不变
+                pass  # 不重新计算宽高
+            else:
+                # 默认分配（新创建的形状）
+                self.height = max([val1, val2])
+                self.width = min([val1, val2])
             
             # 最后设置角度，避免被updateOBBInfo覆盖
             self.angle = new_angle
@@ -284,37 +301,90 @@ class Shape(object):
                               ((self.points[1].y()-self.points[0].y())**2) )
             val2 = math.sqrt( ((self.points[2].x()-self.points[1].x())**2) + 
                               ((self.points[2].y()-self.points[1].y())**2) )
-            self.height = max([val1, val2])
-            self.width = min([val1, val2])
+            
+            # 不强制height > width，保持原有的宽高分配
+            # 如果已有宽高值，保持其分配关系
+            if hasattr(self, 'width') and hasattr(self, 'height') and self.width > 0 and self.height > 0:
+                # 保持原有的宽高分配关系，只更新数值
+                total_length = val1 + val2
+                original_total = self.width + self.height
+                if original_total > 0:
+                    self.width = self.width * total_length / original_total
+                    self.height = self.height * total_length / original_total
+            else:
+                # 新创建的形状，默认分配方式
+                self.height = max([val1, val2])
+                self.width = min([val1, val2])
             if (np.argmax([val1, val2]) == 0): # Height is point[0] to point[1]
-                self.angle = math.degrees( math.atan2( math.fabs(self.points[0].y()-self.points[1].y()), 
-                                                       math.fabs(self.points[0].x()-self.points[1].x()) ) )
-                # Check if box is slanted like West-North to East-South
-                larger_x_point_id = np.argmax([self.points[0].x(), self.points[1].x()])
-                if (    self.points[larger_x_point_id].y()>self.points[1 if (larger_x_point_id==0) else 0].y()   ):
-                    self.angle = -self.angle
+                self.angle = math.degrees(math.atan2(
+                    self.points[1].y() - self.points[0].y(),
+                    self.points[1].x() - self.points[0].x()
+                ))
+                # Normalize angle to [0, 180)
+                if self.angle >= 180:
+                    self.angle -= 180
+                elif self.angle < 0:
+                    self.angle += 180
             else: # Height is point[1] to point[2]
-                self.angle = math.degrees( math.atan2( math.fabs(self.points[1].y()-self.points[2].y()), 
-                                                       math.fabs(self.points[1].x()-self.points[2].x()) ) )
-                # Check if box is slanted like West-North to East-South
-                larger_x_point_id = np.argmax([self.points[1].x(), self.points[2].x()]) + 1
-                if (self.points[larger_x_point_id].y() > self.points[2 if (larger_x_point_id==1) else 1].y()):
-                    self.angle = -self.angle
+                self.angle = math.degrees(math.atan2(
+                    self.points[2].y() - self.points[1].y(),
+                    self.points[2].x() - self.points[1].x()
+                ))
+                # Normalize angle to [0, 180)
+                if self.angle >= 180:
+                    self.angle -= 180
+                elif self.angle < 0:
+                    self.angle += 180
     
-    def updatePointsFromOBBInfo(self, canvas_width, canvas_height):
-        # 计算原始顶点
+    def _calculateArea(self):
+        """
+        计算形状的实际面积
+        
+        Returns:
+            float: 形状的面积
+        """
+        if len(self.points) < 4:
+            return 0.0
+        
+        # 使用鞋带公式（Shoelace formula）计算多边形面积
+        area = 0.0
+        n = len(self.points)
+        for i in range(n):
+            j = (i + 1) % n
+            area += self.points[i].x() * self.points[j].y()
+            area -= self.points[j].x() * self.points[i].y()
+        return abs(area) / 2.0
+
+    def _calculateVertices(self):
+        """
+        根据当前的OBB参数（origin, width, height, angle）计算四个顶点坐标
+        
+        Returns:
+            List[float]: 包含8个坐标值的列表 [x1, y1, x2, y2, x3, y3, x4, y4]
+                        顺序为：右上角、左上角、左下角、右下角
+        """
         p = []
-        p.append(self.origin[0] + self.height*math.cos(math.radians(self.angle))/2.0 + self.width*math.cos(math.radians(90+self.angle))/2.0)
-        p.append(self.origin[1] - self.height*math.sin(math.radians(self.angle))/2.0 - self.width*math.sin(math.radians(90+self.angle))/2.0)
+        # 第一个顶点 (右上角)
+        p.append(self.origin[0] + self.width*math.cos(math.radians(self.angle))/2.0 + self.height*math.cos(math.radians(90+self.angle))/2.0)
+        p.append(self.origin[1] - self.width*math.sin(math.radians(self.angle))/2.0 - self.height*math.sin(math.radians(90+self.angle))/2.0)
         
-        p.append(self.origin[0] - self.height*math.cos(math.radians(self.angle))/2.0 + self.width*math.cos(math.radians(90+self.angle))/2.0)
-        p.append(self.origin[1] + self.height*math.sin(math.radians(self.angle))/2.0 - self.width*math.sin(math.radians(90+self.angle))/2.0)
+        # 第二个顶点 (左上角)
+        p.append(self.origin[0] - self.width*math.cos(math.radians(self.angle))/2.0 + self.height*math.cos(math.radians(90+self.angle))/2.0)
+        p.append(self.origin[1] + self.width*math.sin(math.radians(self.angle))/2.0 - self.height*math.sin(math.radians(90+self.angle))/2.0)
         
-        p.append(self.origin[0] - self.height*math.cos(math.radians(self.angle))/2.0 - self.width*math.cos(math.radians(90+self.angle))/2.0)
-        p.append(self.origin[1] + self.height*math.sin(math.radians(self.angle))/2.0 + self.width*math.sin(math.radians(90+self.angle))/2.0)
+        # 第三个顶点 (左下角)
+        p.append(self.origin[0] - self.width*math.cos(math.radians(self.angle))/2.0 - self.height*math.cos(math.radians(90+self.angle))/2.0)
+        p.append(self.origin[1] + self.width*math.sin(math.radians(self.angle))/2.0 + self.height*math.sin(math.radians(90+self.angle))/2.0)
         
-        p.append(self.origin[0] + self.height*math.cos(math.radians(self.angle))/2.0 - self.width*math.cos(math.radians(90+self.angle))/2.0)
-        p.append(self.origin[1] - self.height*math.sin(math.radians(self.angle))/2.0 + self.width*math.sin(math.radians(90+self.angle))/2.0)
+        # 第四个顶点 (右下角)
+        p.append(self.origin[0] + self.width*math.cos(math.radians(self.angle))/2.0 - self.height*math.cos(math.radians(90+self.angle))/2.0)
+        p.append(self.origin[1] - self.width*math.sin(math.radians(self.angle))/2.0 + self.height*math.sin(math.radians(90+self.angle))/2.0)
+        
+        return p
+
+    def updatePointsFromOBBInfo(self, canvas_width, canvas_height):
+        # 第一次计算顶点
+        p = self._calculateVertices()
         
         # 检查是否有顶点超出边界
         out_of_bounds = False
@@ -377,19 +447,8 @@ class Shape(object):
                 self.height = min(self.height, max_available_height)
                 self.width = self.height * aspect_ratio
             
-            # 重新计算顶点
-            p = []
-            p.append(self.origin[0] + self.height*math.cos(math.radians(self.angle))/2.0 + self.width*math.cos(math.radians(90+self.angle))/2.0)
-            p.append(self.origin[1] - self.height*math.sin(math.radians(self.angle))/2.0 - self.width*math.sin(math.radians(90+self.angle))/2.0)
-            
-            p.append(self.origin[0] - self.height*math.cos(math.radians(self.angle))/2.0 + self.width*math.cos(math.radians(90+self.angle))/2.0)
-            p.append(self.origin[1] + self.height*math.sin(math.radians(self.angle))/2.0 - self.width*math.sin(math.radians(90+self.angle))/2.0)
-            
-            p.append(self.origin[0] - self.height*math.cos(math.radians(self.angle))/2.0 - self.width*math.cos(math.radians(90+self.angle))/2.0)
-            p.append(self.origin[1] + self.height*math.sin(math.radians(self.angle))/2.0 + self.width*math.sin(math.radians(90+self.angle))/2.0)
-            
-            p.append(self.origin[0] + self.height*math.cos(math.radians(self.angle))/2.0 - self.width*math.cos(math.radians(90+self.angle))/2.0)
-            p.append(self.origin[1] - self.height*math.sin(math.radians(self.angle))/2.0 + self.width*math.sin(math.radians(90+self.angle))/2.0)
+            # 使用调整后的参数重新计算顶点
+            p = self._calculateVertices()
         
         # 添加点
         self.points = []  # 清空现有点
@@ -425,6 +484,7 @@ class Shape(object):
         shape.fill = self.fill
         shape.selected = self.selected
         shape._closed = self._closed
+        shape.rotation_enabled = self.rotation_enabled  # 复制旋转设置
         if self.line_color != Shape.line_color:
             shape.line_color = self.line_color
         if self.fill_color != Shape.fill_color:
